@@ -22,7 +22,8 @@ export const handler: APIGatewayProxyHandler = async (event, _): Promise<APIGate
             statusCode: 200,
             body: content,
             headers: {
-                'Content-Type': mime_types.lookup(filename)
+                'Content-Type': mime_types.lookup(filename),
+                'Cache-Control': 'no-store'
             },
             isBase64Encoded: !isText(filename)
         }
