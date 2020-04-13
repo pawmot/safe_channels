@@ -1,0 +1,11 @@
+@startuml
+Alice -> Samuel: Message
+alt channel active
+    Samuel -> Bob : Message
+    Samuel --> Alice : Sent
+    Bob --> Samuel : Seen
+    Samuel --> Alice : Seen
+else chan marked for deletion
+    Samuel -> Alice : CLOSE
+end
+@enduml

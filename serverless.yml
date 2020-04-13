@@ -1,0 +1,36 @@
+service:
+  name: safe-channels
+
+custom:
+  webpack:
+    webpackConfig: ./webpack.config.js
+    includeModules: true
+
+plugins:
+  - serverless-webpack
+  - serverless-apigwy-binary
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  region: eu-west-1
+  apiGateway:
+    minimumCompressionSize: 1024
+  environment:
+    AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
+  apigwyBinary:
+    types:
+      - 'image/vnc.microsoft.icon'
+
+functions:
+  static:
+    handler: fn/static.handler
+    events:
+      - http:
+          method: get
+          path: /{filepath+}
+          contentHandling: CONVERT_TO_BINARY
+          binary: [ 'image/*' ]
+      - http:
+          method: get
+          path: /

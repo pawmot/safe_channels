@@ -1,0 +1,10 @@
+@startuml
+Alice -> Samuel: Create Channel
+note left: Json TextFrame
+
+alt success
+    Samuel -> Alice: Channel Created
+else channel already exists
+    Samuel -> Alice: Channel Already Exists
+end
+@enduml

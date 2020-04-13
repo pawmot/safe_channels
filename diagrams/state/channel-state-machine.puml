@@ -1,0 +1,13 @@
+@startuml
+scale 600 width
+[*] --> Open : CreateChannel
+Open --> ConnPending : Connection Request
+ConnPending --> Connected : ECDHCompleted
+ConnPending -> Open : ConnRefused
+
+Open --> MarkedForDeletion : Timeout
+Connected --> MarkedForDeletion : Timeout
+ConnPending ---> MarkedForDeletion : Timeout
+
+MarkedForDeletion -> [*] : DelTimeout
+@enduml

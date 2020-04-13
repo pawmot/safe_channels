@@ -1,0 +1,18 @@
+@startuml
+Bob -> Samuel: Connect to channel
+note left: Json TextFrame
+
+alt chan exists and is open
+    Samuel -> Alice: Connection request
+    alt Alice accepts
+        Alice -> Bob: SYN ACK (pub key A)
+        note right: Binary?
+        note left: both via Samuel
+        Bob -> Alice: ACK (pub key B)
+    else Alice refuses
+        Alice -> Bob: Connection refused
+    end
+else chan does not exist OR is not open
+    Samuel -> Bob: Connection refused
+end
+@enduml
