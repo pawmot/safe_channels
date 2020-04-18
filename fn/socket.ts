@@ -9,6 +9,12 @@ import Key = DocumentClient.Key;
 const ddb = new DynamoDB.DocumentClient();
 const tableName = process.env["CHANNELS_TABLE"];
 
+export const handleConnection: Handler<APIGatewayProxyEvent> = async (ev): Promise<APIGatewayWebsocketResult> => {
+    return {
+        statusCode: 200
+    }
+}
+
 export const handleDisconnection: Handler<APIGatewayProxyEvent> = async (ev): Promise<APIGatewayWebsocketResult> => {
     let finished = false;
     let startKey: Key = null;
@@ -51,13 +57,6 @@ export const handleDisconnection: Handler<APIGatewayProxyEvent> = async (ev): Pr
     return {
         statusCode: 200
     }
-}
-
-export const handleMsg: Handler<APIGatewayProxyEvent> = async (ev): Promise<APIGatewayWebsocketResult> => {
-    return {
-        statusCode: 200,
-        body: JSON.stringify({route: ev.requestContext.routeKey})
-    };
 }
 
 export const handleCreateChannel: Handler<APIGatewayProxyEvent> = async (ev): Promise<APIGatewayWebsocketResult> => {
@@ -112,7 +111,6 @@ export const handleCreateChannel: Handler<APIGatewayProxyEvent> = async (ev): Pr
 
 export const handleConnectToChannel: Handler<APIGatewayProxyEvent> = async (ev): Promise<APIGatewayWebsocketResult> => {
     const cmd = <ConnectToChannelCommand>JSON.parse(ev.body);
-    console.log(cmd);
 
     const input: GetItemInput = {
         Key: { "channelName" : cmd.channelName},
@@ -144,6 +142,7 @@ export const handleConnectToChannel: Handler<APIGatewayProxyEvent> = async (ev):
     }
 
     await sendMessageToClient(getCallbackUrl(ev), channel.connectionIds[0], cmd);
+    await sendMessageToClient(getCallbackUrl(ev), ev.requestContext.connectionId, new Result(ResultCodes.CONNECTED));
 
     await ddb.update({
         TableName: tableName,
@@ -166,6 +165,30 @@ export const handleConnectToChannel: Handler<APIGatewayProxyEvent> = async (ev):
     };
 }
 
+export const handleMessage: Handler<APIGatewayProxyEvent> = async (ev): Promise<APIGatewayWebsocketResult> => {
+    const cmd = <MessageCommand>JSON.parse(ev.body);
+
+    const input: GetItemInput = {
+        Key: { "channelName" : cmd.channelName},
+        TableName: tableName
+    }
+
+    const result = await ddb.get(input).promise();
+
+    const channel: Channel = {
+        channelName: <string>result.Item["channelName"],
+        isOpen: <boolean>result.Item["isOpen"],
+        createdAt: new Date(result.Item["createdAt"]),
+        connectionIds: <string[]>(result.Item["connectionIds"].values)
+    }
+
+    await sendMessageToClient(getCallbackUrl(ev), channel.connectionIds.filter(cid => cid !== ev.requestContext.connectionId)[0], cmd);
+
+    return {
+        statusCode: 200
+    };
+}
+
 const sendMessageToClient = (url: string, connectionId: string, payload: any) => {
     const api = new ApiGatewayManagementApi({
         apiVersion: '2018-11-29',
@@ -182,7 +205,6 @@ const sendMessageToClient = (url: string, connectionId: string, payload: any) =>
 function getCallbackUrl(event: APIGatewayProxyEvent): string {
     const domain = event.requestContext.domainName;
     const stage = event.requestContext.stage;
-    console.log(util.format(util.format('https://%s/%s', domain, stage)))
     return util.format(util.format('https://%s/%s', domain, stage));
 }
 
@@ -208,6 +230,13 @@ interface ConnectToChannelCommand {
     channelName: string;
 }
 
+interface MessageCommand {
+    action: "message";
+    channelName: string;
+    type: 0 | 1;
+    encodedMsg: string;
+}
+
 class Result {
     constructor(public code: ResultCodes) {
     }
@@ -215,6 +244,7 @@ class Result {
 
 enum ResultCodes {
     CHANNEL_CREATED,
+    CONNECTED,
     CHANNEL_NAME_ALREADY_TAKEN,
     WRONG_CHANNEL,
     SOMETHING_WENT_WRONG
