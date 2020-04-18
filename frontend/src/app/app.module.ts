@@ -6,16 +6,18 @@ import { AppComponent } from './app.component';
 import {environment} from '../environments/environment';
 import {FormsModule} from '@angular/forms';
 import {CommonModule} from '@angular/common';
+import {NgxLinkifyjsModule} from "ngx-linkifyjs";
 
 @NgModule({
   declarations: [
-    AppComponent
+    AppComponent,
   ],
   imports: [
     BrowserModule,
     AppRoutingModule,
     FormsModule,
-    CommonModule
+    CommonModule,
+    NgxLinkifyjsModule.forRoot()
   ],
   providers: [],
   bootstrap: [AppComponent]

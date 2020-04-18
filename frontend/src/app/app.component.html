@@ -12,7 +12,7 @@
   <label for="message">Message</label>
   <input id="message" [(ngModel)]="message" type="text" [disabled]="state !== 3">
   <button (click)="sendMessage()" [disabled]="state !== 3">Send</button>
-  <p *ngFor="let line of lines">
-    {{line.text}}
-  </p>
+  <div *ngFor="let line of lines">
+    <p [innerHTML]="line.text | linkify"></p>
+  </div>
 </div>
