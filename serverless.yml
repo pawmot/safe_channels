@@ -8,19 +8,28 @@ custom:
 
 plugins:
   - serverless-webpack
-  - serverless-apigwy-binary
+  - serverless-pseudo-parameters
 
 provider:
   name: aws
   runtime: nodejs12.x
   region: eu-west-1
+  websocketsApiName: safe-channels-ws-api
+  websocketsApiRouteSelectionExpression: $request.body.action
   apiGateway:
     minimumCompressionSize: 1024
   environment:
     AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
-  apigwyBinary:
-    types:
-      - 'image/vnc.microsoft.icon'
+  iamRoleStatements:
+    - Effect: Allow
+      Action: dynamodb:PutItem
+      Resource: arn:aws:dynamodb:#{AWS::Region}:#{AWS::AccountId}:table/channels
+    - Effect: Allow
+      Action: dynamodb:GetItem
+      Resource: arn:aws:dynamodb:#{AWS::Region}:#{AWS::AccountId}:table/channels
+    - Effect: Allow
+      Action: dynamodb:UpdateItem
+      Resource: arn:aws:dynamodb:#{AWS::Region}:#{AWS::AccountId}:table/channels
 
 functions:
   static:
@@ -30,7 +39,46 @@ functions:
           method: get
           path: /{filepath+}
           contentHandling: CONVERT_TO_BINARY
-          binary: [ 'image/*' ]
       - http:
           method: get
           path: /
+  handleDisconnection:
+    handler: fn/socket.handleDisconnection
+    events:
+      - websocket:
+          route: $disconnect
+  handleMsg:
+    handler: fn/socket.handleMsg
+    events:
+      - websocket:
+          route: $default
+  handleCreateChannel:
+    handler: fn/socket.handleCreateChannel
+    events:
+      - websocket:
+          route: createChannel
+    environment:
+      CHANNELS_TABLE: channels
+  handleConnectToChannel:
+    handler: fn/socket.handleConnectToChannel
+    events:
+      - websocket:
+          route: connectToChannel
+    environment:
+      CHANNELS_TABLE: channels
+
+resources:
+  Resources:
+    restaurantsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: channels
+        AttributeDefinitions:
+          - AttributeName: channelName
+            AttributeType: S
+        KeySchema:
+          - AttributeName: channelName
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
