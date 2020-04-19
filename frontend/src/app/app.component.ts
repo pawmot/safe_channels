@@ -18,9 +18,13 @@ export class AppComponent implements OnInit {
   state: ChannelState = ChannelState.ENTRY;
   error?: string;
   message: string = "";
+  creatorPubKey: string;
+  connecteePubKey: string
+  fingerprint: string;
   private key: EC.KeyPair;
   private ec: EC;
   private sharedKey: number[];
+  private isChannelCreator: boolean;
 
   ngOnInit(): void {
     this.ec = new EC("curve25519");
@@ -30,11 +34,13 @@ export class AppComponent implements OnInit {
   }
 
   connect() {
+    this.isChannelCreator = false;
     this.socket.send(JSON.stringify(new ConnectToChannelCommand(this.channelName)))
     this.error = null;
   }
 
   create() {
+    this.isChannelCreator = true;
     this.socket.send(JSON.stringify(new CreateChannelCommand(this.channelName)))
     this.error = null;
   }
@@ -94,6 +100,8 @@ export class AppComponent implements OnInit {
           this.sharedKey = hash.sha256().update(derivedKey.toString(16)).digest();
           this.lines.push(new Line("ECDH complete, channel is now secure!"));
           this.error = null;
+          this.computeFingerprint(msg.encodedMsg);
+          this.lines.push(new Line(`Channel fingerprint: ${this.fingerprint}`));
           this.state = ChannelState.CONNECTED;
         } else {
           this.error = "Got an unexpected non-ECDH message";
@@ -160,6 +168,19 @@ export class AppComponent implements OnInit {
     const pubkey = this.key.getPublic().encodeCompressed("hex");
     this.socket.send(JSON.stringify(new MessageCommand(this.channelName, MessageType.ECDH, pubkey)));
     this.lines.push(new Line("Initiated ECDH, waiting for public key from second party..."));
+  }
+
+  private computeFingerprint(otherPubKey: string) {
+    const selfPubKey = this.key.getPublic().encodeCompressed("hex");
+    if (this.isChannelCreator) {
+      this.creatorPubKey = selfPubKey;
+      this.connecteePubKey = otherPubKey;
+    } else {
+      this.creatorPubKey = otherPubKey;
+      this.connecteePubKey = selfPubKey;
+    }
+
+    this.fingerprint = hash.sha1().update(this.creatorPubKey + this.connecteePubKey).digest("hex").substr(0, 5);
   }
 }
 
