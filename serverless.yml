@@ -30,6 +30,12 @@ provider:
     - Effect: Allow
       Action: dynamodb:UpdateItem
       Resource: arn:aws:dynamodb:#{AWS::Region}:#{AWS::AccountId}:table/channels
+    - Effect: Allow
+      Action: dynamodb:Scan
+      Resource: arn:aws:dynamodb:#{AWS::Region}:#{AWS::AccountId}:table/channels
+    - Effect: Allow
+      Action: dynamodb:DeleteItem
+      Resource: arn:aws:dynamodb:#{AWS::Region}:#{AWS::AccountId}:table/channels
 
 functions:
   static:
@@ -52,6 +58,8 @@ functions:
     events:
       - websocket:
           route: $disconnect
+    environment:
+      CHANNELS_TABLE: channels
   handleCreateChannel:
     handler: fn/socket.handleCreateChannel
     events:

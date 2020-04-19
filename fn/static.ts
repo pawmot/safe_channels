@@ -1,3 +1,4 @@
+import "source-map-support/register";
 import {APIGatewayProxyEvent, APIGatewayProxyHandler, APIGatewayProxyResult} from "aws-lambda";
 import * as fs from "fs";
 import * as mime_types from "mime-types";

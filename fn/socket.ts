@@ -1,3 +1,4 @@
+import "source-map-support/register";
 import {APIGatewayEventRequestContext, APIGatewayProxyEvent, APIGatewayProxyResult, Handler} from "aws-lambda";
 import {AWSError, DynamoDB, ApiGatewayManagementApi} from "aws-sdk";
 import {DocumentClient} from "aws-sdk/lib/dynamodb/document_client";
@@ -10,6 +11,8 @@ const ddb = new DynamoDB.DocumentClient();
 const tableName = process.env["CHANNELS_TABLE"];
 
 export const handleConnection: Handler<APIGatewayProxyEvent> = async (ev): Promise<APIGatewayWebsocketResult> => {
+    console.log(`${ev.requestContext.connectionId} is connecting`);
+
     return {
         statusCode: 200
     }
@@ -18,21 +21,25 @@ export const handleConnection: Handler<APIGatewayProxyEvent> = async (ev): Promi
 export const handleDisconnection: Handler<APIGatewayProxyEvent> = async (ev): Promise<APIGatewayWebsocketResult> => {
     let finished = false;
     let startKey: Key = null;
+    let totalClosed = 0;
+
+    console.log(`${ev.requestContext.connectionId} is disconnecting`);
 
     while (!finished) {
         const result = await ddb.scan({
             TableName: tableName,
-            FilterExpression: "in(connectionIds, :id)",
-            ExpressionAttributeValues: { ":id": { S: ev.requestContext.connectionId } }
+            ExclusiveStartKey: startKey,
+            FilterExpression: "contains(connectionIds, :id)",
+            ExpressionAttributeValues: { ":id": ev.requestContext.connectionId }
         }).promise();
 
-        if (!result.LastEvaluatedKey) {
+        if (result.LastEvaluatedKey) {
             startKey = result.LastEvaluatedKey;
         } else {
             finished = true;
         }
 
-        for(let i = 0; i <= result.Items.length; i++) {
+        for(let i = 0; i < result.Items.length; i++) {
             const item = result.Items[0];
             const channel: Channel = {
                 channelName: <string>item["channelName"],
@@ -51,16 +58,20 @@ export const handleDisconnection: Handler<APIGatewayProxyEvent> = async (ev): Pr
                 TableName: tableName,
                 Key: {"channelName": channel.channelName}
             }).promise();
+            totalClosed++;
         }
     }
 
+    console.log(`Number of closed channels: ${totalClosed}`);
+
     return {
         statusCode: 200
-    }
+    };
 }
 
 export const handleCreateChannel: Handler<APIGatewayProxyEvent> = async (ev): Promise<APIGatewayWebsocketResult> => {
     const cmd = <CreateChannelCommand>JSON.parse(ev.body);
+    console.log(`${ev.requestContext.connectionId} is creating channel ${cmd.channelName}`);
 
     const input: PutItemInput = {
         Item: {
@@ -111,6 +122,7 @@ export const handleCreateChannel: Handler<APIGatewayProxyEvent> = async (ev): Pr
 
 export const handleConnectToChannel: Handler<APIGatewayProxyEvent> = async (ev): Promise<APIGatewayWebsocketResult> => {
     const cmd = <ConnectToChannelCommand>JSON.parse(ev.body);
+    console.log(`${ev.requestContext.connectionId} is connecting to channel ${cmd.channelName}`);
 
     const input: GetItemInput = {
         Key: { "channelName" : cmd.channelName},

@@ -5,14 +5,13 @@
   <label for="channelName">Channel name</label>
   <input id="channelName" [(ngModel)]="channelName" type="text"/>
   <br>
-  <button (click)="connect()">Connect</button>
-  <button (click)="create()">Create</button>
+  <button (click)="connect()" [disabled]="!channelName">Connect</button>
+  <button (click)="create()" [disabled]="!channelName">Create</button>
 </div>
 <div *ngIf="state !== 0">
   <label for="message">Message</label>
   <input id="message" [(ngModel)]="message" type="text" [disabled]="state !== 3">
   <button (click)="sendMessage()" [disabled]="state !== 3">Send</button>
-  <div *ngFor="let line of lines">
-    <p [innerHTML]="line.text | linkify"></p>
-  </div>
+  <p *ngFor="let line of lines" [innerHTML]="line.text | linkify">
+  </p>
 </div>

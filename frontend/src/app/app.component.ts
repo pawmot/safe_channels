@@ -85,25 +85,49 @@ export class AppComponent implements OnInit {
   }
 
   handleMessageInEcdhState(ev: MessageEvent) {
-    const msg = <MessageCommand>JSON.parse(ev.data);
-    if (msg.type === MessageType.ECDH) {
-      const derivedKey = this.key.derive(this.ec.keyFromPublic(msg.encodedMsg, "hex").getPublic());
-      this.sharedKey = hash.sha256().update(derivedKey.toString(16)).digest();
-      this.lines.push(new Line("ECDH complete, channel is now secure!"));
-      this.error = null;
-      this.state = ChannelState.CONNECTED;
-    } else {
-      this.error = "Got an unexpected non-ECDH message";
+    const cmd = <Command>JSON.parse(ev.data);
+    switch (cmd.action) {
+      case "message" :
+       const msg = <MessageCommand>cmd;
+        if (msg.type === MessageType.ECDH) {
+          const derivedKey = this.key.derive(this.ec.keyFromPublic(msg.encodedMsg, "hex").getPublic());
+          this.sharedKey = hash.sha256().update(derivedKey.toString(16)).digest();
+          this.lines.push(new Line("ECDH complete, channel is now secure!"));
+          this.error = null;
+          this.state = ChannelState.CONNECTED;
+        } else {
+          this.error = "Got an unexpected non-ECDH message";
+        }
+        break;
+
+      case "closeChannel":
+        this.lines = [];
+        this.error = null;
+        this.channelName = "";
+        this.message = "";
+        this.state = ChannelState.ENTRY;
     }
   }
 
   handleMessageInConnectedState(ev: MessageEvent) {
-    const msg = <MessageCommand>JSON.parse(ev.data);
-    if (msg.type === MessageType.Regular) {
-      this.error = null;
-      this.lines.push(new Line("<<< " + this.decrypt(msg.encodedMsg)));
-    } else {
-      this.error = "Got an unexpected non-Regular message";
+    const cmd = <Command>JSON.parse(ev.data);
+    switch (cmd.action) {
+      case "message" :
+        const msg = <MessageCommand>cmd;
+        if (msg.type === MessageType.Regular) {
+          this.error = null;
+          this.lines.push(new Line("<<< " + this.decrypt(msg.encodedMsg)));
+        } else {
+          this.error = "Got an unexpected non-Regular message";
+        }
+        break;
+
+      case "closeChannel":
+        this.lines = [];
+        this.error = null;
+        this.channelName = "";
+        this.message = "";
+        this.state = ChannelState.ENTRY;
     }
   }
 
@@ -163,6 +187,13 @@ class MessageCommand implements Command {
   }
 
   action: "message" = "message";
+}
+
+class CloseChannelCommand implements Command {
+  constructor(public channelName: string) {
+  }
+
+  action: "closeChannel" = "closeChannel";
 }
 
 enum MessageType {
