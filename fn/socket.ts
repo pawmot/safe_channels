@@ -1,6 +1,6 @@
 import "source-map-support/register";
-import {APIGatewayEventRequestContext, APIGatewayProxyEvent, APIGatewayProxyResult, Handler} from "aws-lambda";
-import {AWSError, DynamoDB, ApiGatewayManagementApi} from "aws-sdk";
+import {APIGatewayProxyEvent, Handler} from "aws-lambda";
+import {DynamoDB, ApiGatewayManagementApi} from "aws-sdk";
 import {DocumentClient} from "aws-sdk/lib/dynamodb/document_client";
 import PutItemInput = DocumentClient.PutItemInput;
 import * as util from "util";

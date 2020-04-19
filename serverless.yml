@@ -48,11 +48,13 @@ functions:
       - http:
           method: get
           path: /
+
   handleConnection:
     handler: fn/socket.handleConnection
     events:
       - websocket:
           route: $connect
+
   handleDisconnection:
     handler: fn/socket.handleDisconnection
     events:
@@ -60,6 +62,7 @@ functions:
           route: $disconnect
     environment:
       CHANNELS_TABLE: channels
+
   handleCreateChannel:
     handler: fn/socket.handleCreateChannel
     events:
@@ -67,6 +70,7 @@ functions:
           route: createChannel
     environment:
       CHANNELS_TABLE: channels
+
   handleConnectToChannel:
     handler: fn/socket.handleConnectToChannel
     events:
@@ -74,6 +78,7 @@ functions:
           route: connectToChannel
     environment:
       CHANNELS_TABLE: channels
+
   handleMessage:
     handler: fn/socket.handleMessage
     events:
