@@ -1,7 +1,7 @@
 Safe Channels
 ====
 
-###Summary
+### Summary
 Serverless (AWS Lambda) app for exchanging pieces of data safely between two parties.
 * No storing of messages, just pass-through
 * E2E encryption (ECDHE/X25519, AES, shared keys hashing with SHA256)
@@ -9,7 +9,7 @@ Serverless (AWS Lambda) app for exchanging pieces of data safely between two par
     * AES
     * Shared keys are hashed with SHA256
 
-###Todo
+### Todo
 
 * Fix binary files serving (e.g. favicon)
 * Set up HTTP caching (AWS API GW? Or possibly move the static files out of Lambda)
