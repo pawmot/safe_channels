@@ -25,27 +25,39 @@ export class AppComponent implements OnInit {
   private ec: EC;
   private sharedKey: number[];
   private isChannelCreator: boolean;
+  private pingTimeoutId?: number = null;
+
 
   ngOnInit(): void {
     this.ec = new EC("curve25519");
     this.key = this.ec.genKeyPair();
-    this.socket = AppComponent.getSocket();
-    this.socket.onmessage = this.handle.bind(this);
+    this.createSocket();
   }
 
   connect() {
     this.isChannelCreator = false;
-    this.socket.send(JSON.stringify(new ConnectToChannelCommand(this.channelName)))
+    this.sendToServer(new ConnectToChannelCommand(this.channelName));
     this.error = null;
   }
 
   create() {
     this.isChannelCreator = true;
-    this.socket.send(JSON.stringify(new CreateChannelCommand(this.channelName)))
+    this.sendToServer(new CreateChannelCommand(this.channelName));
     this.error = null;
   }
 
+  private handleClosingSocket() {
+    this.lines = [];
+    this.error = null;
+    this.channelName = "";
+    this.message = "";
+    this.state = ChannelState.ENTRY;
+  }
+
   private handle(ev: MessageEvent) {
+    const result = <Result>JSON.parse(ev.data);
+    if (result.code === ResultCodes.PONG) return;
+
     switch (this.state) {
       case ChannelState.ENTRY:
         this.handleMessageInEntryState(ev);
@@ -143,11 +155,28 @@ export class AppComponent implements OnInit {
     this.lines.push(new Line(`>>> ${this.message}`));
     const cipherText = this.encrypt(this.message);
     this.message = "";
-    this.socket.send(JSON.stringify(new MessageCommand(this.channelName, MessageType.Regular, cipherText)));
+    this.sendToServer(new MessageCommand(this.channelName, MessageType.Regular, cipherText));
   }
 
-  private static getSocket() : WebSocket {
-    return new WebSocket(environment.wssAddress);
+  private createSocket() {
+    this.socket = new WebSocket(environment.wssAddress);
+    this.socket.onmessage = this.handle.bind(this);
+    this.socket.onclose = this.handleClosingSocket.bind(this);
+    this.pingTimeoutId = <number><unknown>setTimeout(() => {
+      this.pingTimeoutId = null;
+      this.sendToServer(new PingCommand())
+    }, 5000);
+  }
+
+  private sendToServer(message: any) {
+    this.socket.send(JSON.stringify(message));
+    if (this.pingTimeoutId) {
+      clearTimeout(this.pingTimeoutId);
+    }
+    this.pingTimeoutId = <number><unknown>setTimeout(() => {
+      this.pingTimeoutId = null;
+      this.sendToServer(new PingCommand())
+    }, 5000);
   }
 
   private encrypt(plaintext: string): string {
@@ -166,7 +195,7 @@ export class AppComponent implements OnInit {
 
   private initiateEcdh() {
     const pubkey = this.key.getPublic().encodeCompressed("hex");
-    this.socket.send(JSON.stringify(new MessageCommand(this.channelName, MessageType.ECDH, pubkey)));
+    this.sendToServer(new MessageCommand(this.channelName, MessageType.ECDH, pubkey));
     this.lines.push(new Line("Initiated ECDH, waiting for public key from second party..."));
   }
 
@@ -235,6 +264,7 @@ enum ResultCodes {
   CONNECTED,
   CHANNEL_NAME_ALREADY_TAKEN,
   WRONG_CHANNEL,
+  PONG,
   SOMETHING_WENT_WRONG
 }
 
@@ -244,3 +274,8 @@ enum ChannelState {
   ECDH,
   CONNECTED
 }
+
+class PingCommand implements Command{
+  action: "ping" = "ping"
+}
+

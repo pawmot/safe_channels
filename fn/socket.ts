@@ -18,6 +18,14 @@ export const handleConnection: Handler<APIGatewayProxyEvent> = async (ev): Promi
     }
 }
 
+export const handlePing: Handler<APIGatewayProxyEvent> = async (ev): Promise<APIGatewayWebsocketResult> => {
+    sendMessageToClient(getCallbackUrl(ev), ev.requestContext.connectionId, new Result(ResultCodes.PONG));
+
+    return {
+        statusCode: 200
+    }
+}
+
 export const handleDisconnection: Handler<APIGatewayProxyEvent> = async (ev): Promise<APIGatewayWebsocketResult> => {
     let finished = false;
     let startKey: Key = null;
@@ -259,6 +267,7 @@ enum ResultCodes {
     CONNECTED,
     CHANNEL_NAME_ALREADY_TAKEN,
     WRONG_CHANNEL,
+    PONG,
     SOMETHING_WENT_WRONG
 }
 

@@ -55,6 +55,12 @@ functions:
       - websocket:
           route: $connect
 
+  handlePing:
+    handler: fn/socket.handlePing
+    events:
+      - websocket:
+          route: ping
+
   handleDisconnection:
     handler: fn/socket.handleDisconnection
     events:
