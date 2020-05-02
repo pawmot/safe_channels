@@ -1,17 +1,1 @@
-<div *ngIf="error">
-  <p class="error">{{error}}</p>
-</div>
-<div *ngIf="state === 0">
-  <label for="channelName">Channel name</label>
-  <input id="channelName" [(ngModel)]="channelName" type="text"/>
-  <br>
-  <button (click)="connect()" [disabled]="!channelName">Connect</button>
-  <button (click)="create()" [disabled]="!channelName">Create</button>
-</div>
-<div *ngIf="state !== 0">
-  <label for="message">Message</label>
-  <input id="message" [(ngModel)]="message" type="text" [disabled]="state !== 3">
-  <button (click)="sendMessage()" [disabled]="state !== 3">Send</button>
-  <p *ngFor="let line of lines" [innerHTML]="line.text | linkify">
-  </p>
-</div>
+<app-lobby></app-lobby>

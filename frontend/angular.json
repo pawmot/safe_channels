@@ -123,6 +123,10 @@
           }
         }
       }
-    }},
-  "defaultProject": "safe-channels"
+    }
+  },
+  "defaultProject": "safe-channels",
+  "cli": {
+    "defaultCollection": "@ngrx/schematics"
+  }
 }

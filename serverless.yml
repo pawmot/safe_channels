@@ -14,7 +14,8 @@ provider:
   name: aws
   runtime: nodejs12.x
   region: eu-west-1
-  websocketsApiName: safe-channels-ws-api
+  stage: ${opt:stage, 'dev'}
+  websocketsApiName: ${self:provider.stage}-safe-channels-ws-api
   websocketsApiRouteSelectionExpression: $request.body.action
   apiGateway:
     minimumCompressionSize: 1024
@@ -23,19 +24,19 @@ provider:
   iamRoleStatements:
     - Effect: Allow
       Action: dynamodb:PutItem
-      Resource: arn:aws:dynamodb:#{AWS::Region}:#{AWS::AccountId}:table/channels
+      Resource: arn:aws:dynamodb:#{AWS::Region}:#{AWS::AccountId}:table/${self:provider.stage}-channels
     - Effect: Allow
       Action: dynamodb:GetItem
-      Resource: arn:aws:dynamodb:#{AWS::Region}:#{AWS::AccountId}:table/channels
+      Resource: arn:aws:dynamodb:#{AWS::Region}:#{AWS::AccountId}:table/${self:provider.stage}-channels
     - Effect: Allow
       Action: dynamodb:UpdateItem
-      Resource: arn:aws:dynamodb:#{AWS::Region}:#{AWS::AccountId}:table/channels
+      Resource: arn:aws:dynamodb:#{AWS::Region}:#{AWS::AccountId}:table/${self:provider.stage}-channels
     - Effect: Allow
       Action: dynamodb:Scan
-      Resource: arn:aws:dynamodb:#{AWS::Region}:#{AWS::AccountId}:table/channels
+      Resource: arn:aws:dynamodb:#{AWS::Region}:#{AWS::AccountId}:table/${self:provider.stage}-channels
     - Effect: Allow
       Action: dynamodb:DeleteItem
-      Resource: arn:aws:dynamodb:#{AWS::Region}:#{AWS::AccountId}:table/channels
+      Resource: arn:aws:dynamodb:#{AWS::Region}:#{AWS::AccountId}:table/${self:provider.stage}-channels
 
 functions:
   static:
@@ -67,7 +68,7 @@ functions:
       - websocket:
           route: $disconnect
     environment:
-      CHANNELS_TABLE: channels
+      CHANNELS_TABLE: ${self:provider.stage}-channels
 
   handleCreateChannel:
     handler: fn/socket.handleCreateChannel
@@ -75,7 +76,7 @@ functions:
       - websocket:
           route: createChannel
     environment:
-      CHANNELS_TABLE: channels
+      CHANNELS_TABLE: ${self:provider.stage}-channels
 
   handleConnectToChannel:
     handler: fn/socket.handleConnectToChannel
@@ -83,7 +84,7 @@ functions:
       - websocket:
           route: connectToChannel
     environment:
-      CHANNELS_TABLE: channels
+      CHANNELS_TABLE: ${self:provider.stage}-channels
 
   handleMessage:
     handler: fn/socket.handleMessage
@@ -91,14 +92,14 @@ functions:
       - websocket:
           route: message
     environment:
-      CHANNELS_TABLE: channels
+      CHANNELS_TABLE: ${self:provider.stage}-channels
 
 resources:
   Resources:
-    restaurantsTable:
+    channelsTable:
       Type: AWS::DynamoDB::Table
       Properties:
-        TableName: channels
+        TableName: ${self:provider.stage}-channels
         AttributeDefinitions:
           - AttributeName: channelName
             AttributeType: S
