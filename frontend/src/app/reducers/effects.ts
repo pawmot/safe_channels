@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import {Actions, createEffect, ofType} from '@ngrx/effects';
 import {ChannelsService} from "../channels.service";
-import {createChannel} from "./actions";
+import {connectToChannel, createChannel} from "./actions";
 import {map, switchMap, tap, withLatestFrom} from "rxjs/operators";
 import {EMPTY} from "rxjs";
 
@@ -17,5 +17,14 @@ export class ChannelEffects {
       tap(name => this.channelsService.createChannel(name)),
       switchMap(_ => EMPTY)
     )
-  })
+  });
+
+  connectToChannel$ = createEffect(() => {
+    return this.actions$.pipe(
+      ofType(connectToChannel),
+      map(a => a.channelName),
+      tap(name => this.channelsService.connectToChannel(name)),
+      switchMap(_ => EMPTY)
+    )
+  });
 }

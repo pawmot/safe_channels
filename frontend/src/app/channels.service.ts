@@ -1,8 +1,8 @@
-import { Injectable } from '@angular/core';
+import {Injectable} from '@angular/core';
 import {environment} from "../environments/environment";
 import {AppState} from "./reducers";
 import {Store} from "@ngrx/store";
-import {channelCreated, channelCreationFailure} from "./reducers/actions";
+import {channelCreated, channelCreationFailure, connected, connectionFailure} from "./reducers/actions";
 
 @Injectable({
   providedIn: 'root'
@@ -59,10 +59,22 @@ export class ChannelsService {
           break;
 
         case ResultCodes.SOMETHING_WENT_WRONG:
-          this.store.dispatch(channelCreationFailure({channelName: "TODO", errorCode: "channels.err.somethingWentWrong"}));
+          this.store.dispatch(channelCreationFailure({
+            channelName: "TODO",
+            errorCode: "channels.err.somethingWentWrong"
+          }));
           break;
 
-        case ResultCodes.PONG: return;
+        case ResultCodes.CONNECTED:
+          this.store.dispatch(connected({channelName: "TODO"}));
+          break;
+
+        case ResultCodes.WRONG_CHANNEL:
+          this.store.dispatch(connectionFailure({channelName: "TODO", errorCode: "channels.err.wrongChannel"}));
+          break;
+
+        case ResultCodes.PONG:
+          return;
         default:
           unhandledMsgHandler(ev);
       }
@@ -72,7 +84,11 @@ export class ChannelsService {
   }
 
   public createChannel(channelName: string) {
-    this.sendToServer(new CreateChannelCommand(channelName))
+    this.sendToServer(new CreateChannelCommand(channelName));
+  }
+
+  public connectToChannel(channelName: string) {
+    this.sendToServer(new ConnectToChannelCommand(channelName));
   }
 }
 
@@ -86,6 +102,13 @@ class CreateChannelCommand implements Command {
   }
 
   action: "createChannel" = "createChannel";
+}
+
+class ConnectToChannelCommand implements Command {
+  constructor(public channelName: string) {
+  }
+
+  action: "connectToChannel" = "connectToChannel";
 }
 
 class PingCommand implements Command {

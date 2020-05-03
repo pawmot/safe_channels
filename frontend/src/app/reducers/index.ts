@@ -6,7 +6,7 @@ import {
 } from '@ngrx/store';
 import { environment } from '../../environments/environment';
 import {Channel} from "./model/Channel";
-import {channelCreated, channelCreationFailure, createChannel} from "./actions";
+import {channelCreated, channelCreationFailure, connected, connectionFailure, createChannel} from "./actions";
 
 export interface State {
   appState: AppState;
@@ -25,7 +25,9 @@ const initialState: AppState = {
 export const appStateReducers = createReducer(
   initialState,
   on(channelCreated, (_, { channelName }) => ({ channel: new Channel(channelName, true), errorCode: null})),
-  on(channelCreationFailure, (state, { errorCode}) => ({...state, errorCode: errorCode}))
+  on(channelCreationFailure, (state, { errorCode}) => ({...state, errorCode: errorCode})),
+  on(connected, (state, { channelName}) => ({ channel: new Channel(channelName, false), errorCode: null})),
+  on(connectionFailure, (state, {errorCode}) => ({...state, errorCode: errorCode}))
 )
 
 // const channelsReducer = createReducer(

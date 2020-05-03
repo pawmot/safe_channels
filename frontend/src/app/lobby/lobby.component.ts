@@ -3,8 +3,8 @@ import {ec as EC} from "elliptic"
 import * as hash from "hash.js"
 import {Counter, ModeOfOperation, utils} from "aes-js";
 import {Store} from "@ngrx/store";
-import {AppState, selectAppState, State} from "../reducers";
-import {createChannel} from "../reducers/actions";
+import {selectAppState, State} from "../reducers";
+import {connectToChannel, createChannel} from "../reducers/actions";
 import {ChannelsService} from "../channels.service";
 import {ChannelState} from "../reducers/model/Channel";
 import hex = utils.hex;
@@ -39,7 +39,9 @@ export class LobbyComponent implements OnInit {
           if (this.isChannelCreator) {
             this.lines.push(new Line("Waiting for someone to join..."))
           } else {
-            // this.lines.push(new Line("Connected..."))
+            this.lines.push(new Line("Connected..."))
+            this.initiateEcdh();
+            this.state = ChannelState.ECDH;
           }
         }
       }
@@ -56,9 +58,7 @@ export class LobbyComponent implements OnInit {
   }
 
   connect() {
-    this.isChannelCreator = false;
-    this.channelsService.sendToServer(new ConnectToChannelCommand(this.channelName));
-    this.error = null;
+    this.store.dispatch(connectToChannel({channelName: this.channelName}));
   }
 
   create() {
@@ -75,10 +75,6 @@ export class LobbyComponent implements OnInit {
 
   private handle(ev: MessageEvent) {
     switch (this.state) {
-      case ChannelState.ENTRY:
-        this.handleMessageInEntryState(ev);
-        break;
-
       case ChannelState.OPEN:
         this.handleMessageInOpenState(ev);
         break;
@@ -90,26 +86,6 @@ export class LobbyComponent implements OnInit {
       case ChannelState.CONNECTED:
         this.handleMessageInConnectedState(ev)
         break;
-    }
-  }
-
-  handleMessageInEntryState(ev: MessageEvent) {
-    const result = <Result>JSON.parse(ev.data);
-    if (result.code === ResultCodes.CHANNEL_CREATED) {
-      this.state = ChannelState.OPEN;
-      this.error = null;
-      this.lines.push(new Line("Waiting for someone to join..."))
-    } else if (result.code === ResultCodes.CONNECTED) {
-      this.lines.push(new Line("Connected..."))
-      this.initiateEcdh();
-      this.state = ChannelState.ECDH;
-      this.error = null;
-    } else if (result.code === ResultCodes.CHANNEL_NAME_ALREADY_TAKEN) {
-      this.error = "Channel name taken";
-    } else if (result.code === ResultCodes.WRONG_CHANNEL) {
-      this.error = "Wrong channel";
-    } else if (result.code === ResultCodes.SOMETHING_WENT_WRONG) {
-      this.error = "Something went wrong";
     }
   }
 
@@ -214,20 +190,6 @@ class Line {
   }
 }
 
-class CreateChannelCommand implements Command {
-  constructor(public channelName: string) {
-  }
-
-  action: "createChannel" = "createChannel";
-}
-
-class ConnectToChannelCommand implements Command {
-  constructor(public channelName: string) {
-  }
-
-  action: "connectToChannel" = "connectToChannel";
-}
-
 class MessageCommand implements Command {
   constructor(public channelName: string, public type: MessageType, public encodedMsg: string) {
   }
@@ -249,17 +211,4 @@ enum MessageType {
 
 interface Command {
   action: string
-}
-
-interface Result {
-  code: ResultCodes;
-}
-
-enum ResultCodes {
-  CHANNEL_CREATED,
-  CONNECTED,
-  CHANNEL_NAME_ALREADY_TAKEN,
-  WRONG_CHANNEL,
-  PONG,
-  SOMETHING_WENT_WRONG
 }
