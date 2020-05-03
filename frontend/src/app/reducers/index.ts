@@ -4,7 +4,7 @@ import {Channel} from "./model/Channel";
 import {
   addIncomingMessage, addOutgoingMessage, addSystemMessage,
   channelCreated,
-  channelCreationFailure,
+  channelCreationFailure, closeChannel,
   connected,
   connectionFailure, connectToChannel,
   createChannel,
@@ -70,7 +70,8 @@ export const appStateReducers = createReducer<AppState>(
   on(addOutgoingMessage, (state, {content}) => ({
     ...state,
     messages: [...state.messages, new OutgoingMessage(content)]
-  }))
+  })),
+  on(closeChannel, _ => initialState)
 )
 
 // const channelsReducer = createReducer(

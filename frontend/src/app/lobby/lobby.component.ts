@@ -63,50 +63,10 @@ export class LobbyComponent implements OnInit {
     this.message = "";
   }
 
-  // handleMessageInEcdhState(ev: MessageEvent) {
-  //   const cmd = <Command>JSON.parse(ev.data);
-  //   switch (cmd.action) {
-  //     case "message" :
-  //       const msg = <MessageCommand>cmd;
-  //       if (msg.type === MessageType.ECDH) {
-  //         const derivedKey = this.key.derive(this.ec.keyFromPublic(msg.encodedMsg, "hex").getPublic());
-  //         this.sharedKey = hash.sha256().update(derivedKey.toString(16)).digest();
-  //         this.store.dispatch(addSystemMessage({content: "ECDH complete, channel is now secure!"}))
-  //         this.error = null;
-  //         this.computeFingerprint(msg.encodedMsg);
-  //         this.store.dispatch(addSystemMessage({content: `Channel fingerprint: ${this.fingerprint}`}));
-  //         this.state = ChannelState.CONNECTED;
-  //       } else {
-  //         this.error = "Got an unexpected non-ECDH message";
-  //       }
-  //       break;
-  //
-  //     case "closeChannel":
-  //       this.lines = [];
-  //       this.error = null;
-  //       this.channelName = "";
-  //       this.message = "";
-  //       this.state = ChannelState.ENTRY;
-  //   }
-  // }
-
   sendMessage() {
     this.store.dispatch(addOutgoingMessage({content: this.message}));
     this.message = "";
   }
-
-  // private computeFingerprint(otherPubKey: string) {
-  //   const selfPubKey = this.key.getPublic().encodeCompressed("hex");
-  //   if (this.isChannelCreator) {
-  //     this.creatorPubKey = selfPubKey;
-  //     this.connecteePubKey = otherPubKey;
-  //   } else {
-  //     this.creatorPubKey = otherPubKey;
-  //     this.connecteePubKey = selfPubKey;
-  //   }
-  //
-  //   this.fingerprint = hash.sha1().update(this.creatorPubKey + this.connecteePubKey).digest("hex").substr(0, 5);
-  // }
 
 }
 
