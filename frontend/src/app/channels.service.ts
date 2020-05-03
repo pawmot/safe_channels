@@ -2,7 +2,14 @@ import {Injectable} from '@angular/core';
 import {environment} from "../environments/environment";
 import {AppState} from "./reducers";
 import {Store} from "@ngrx/store";
-import {channelCreated, channelCreationFailure, connected, connectionFailure} from "./reducers/actions";
+import {
+  addIncomingMessage,
+  addSystemMessage,
+  channelCreated,
+  channelCreationFailure, closeChannel,
+  connected,
+  connectionFailure, ecdhKeyArrived, otherConnected
+} from "./reducers/actions";
 
 @Injectable({
   providedIn: 'root'
@@ -23,7 +30,7 @@ export class ChannelsService {
   private createSocket(handler: Handler) {
     this.socket = new WebSocket(environment.wssAddress);
     this.connected = true;
-    this.socket.onmessage = (ev) => this.handleMessage(ev, handler.handleMessage);
+    this.socket.onmessage = this.handleMessage.bind(this);
     this.socket.onclose = (ev) => {
       this.connected = false;
       handler.handleClosing(ev);
@@ -34,7 +41,7 @@ export class ChannelsService {
     }, 5000);
   }
 
-  public sendToServer(message: any) {
+  private sendToServer(message: any) {
     if (!this.connected) return;
     this.socket.send(JSON.stringify(message));
     if (this.pingTimeoutId) {
@@ -46,7 +53,7 @@ export class ChannelsService {
     }, 5000);
   }
 
-  private handleMessage(ev: MessageEvent, unhandledMsgHandler: (ev: MessageEvent) => void) {
+  private handleMessage(ev: MessageEvent) {
     let result = <Result>JSON.parse(ev.data);
     if (result.code !== undefined && result.code !== null) {
       switch (result.code) {
@@ -75,11 +82,31 @@ export class ChannelsService {
 
         case ResultCodes.PONG:
           return;
-        default:
-          unhandledMsgHandler(ev);
       }
-    } else {
-      unhandledMsgHandler(ev);
+      return;
+    }
+
+    let cmd = <Command>JSON.parse(ev.data);
+    switch (cmd.action) {
+      case "connectToChannel":
+        this.store.dispatch(otherConnected({channelName: (<ConnectToChannelCommand>cmd).channelName }));
+        break;
+
+      case "message":
+        let msg = <MessageCommand>cmd;
+        switch (msg.type) {
+          case MessageType.ECDH:
+            this.store.dispatch(ecdhKeyArrived({pubkey: msg.encodedMsg}));
+            break;
+
+          case MessageType.Regular:
+            this.store.dispatch(addIncomingMessage({cyphertext: msg.encodedMsg}));
+        }
+        break;
+
+      case "closeChannel":
+        this.store.dispatch(closeChannel({channelName: "TODO"}));
+        break;
     }
   }
 
@@ -90,10 +117,18 @@ export class ChannelsService {
   public connectToChannel(channelName: string) {
     this.sendToServer(new ConnectToChannelCommand(channelName));
   }
+
+  public sendEcdhMessage(channelName: string, pubkey: string) {
+    this.sendToServer(new MessageCommand(channelName, MessageType.ECDH, pubkey));
+    this.store.dispatch(addSystemMessage({content:"Initiated ECDH, waiting for public key from second party..."}));
+  }
+
+  public sendMessage(channelName: string, encryptedMsg: string) {
+    this.sendToServer(new MessageCommand(channelName, MessageType.Regular, encryptedMsg));
+  }
 }
 
 export interface Handler {
-  handleMessage: (ev: MessageEvent) => void;
   handleClosing: (ev: CloseEvent) => void;
 }
 
@@ -111,12 +146,31 @@ class ConnectToChannelCommand implements Command {
   action: "connectToChannel" = "connectToChannel";
 }
 
+class MessageCommand implements Command {
+  constructor(public channelName: string, public type: MessageType, public encodedMsg: string) {
+  }
+
+  action: "message" = "message";
+}
+
+class CloseChannelCommand implements Command {
+  constructor(public channelName: string) {
+  }
+
+  action: "closeChannel" = "closeChannel";
+}
+
 class PingCommand implements Command {
   action = "ping"
 }
 
 interface Command {
   action: string
+}
+
+enum MessageType {
+  ECDH,
+  Regular
 }
 
 interface Result {

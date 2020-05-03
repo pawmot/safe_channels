@@ -26,7 +26,7 @@ import {ChannelEffects} from "./reducers/effects";
     CommonModule,
     NgxLinkifyjsModule.forRoot(),
     BrowserAnimationsModule,
-    StoreModule.forRoot(reducers, {metaReducers: metaReducers}),
+    StoreModule.forRoot(reducers, {metaReducers: metaReducers, runtimeChecks: {strictStateImmutability: false}}), // TODO: enable strict state immutability
     EffectsModule.forRoot([ChannelEffects])
   ],
   providers: [],

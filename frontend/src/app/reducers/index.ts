@@ -1,33 +1,76 @@
-import {
-  ActionReducer,
-  ActionReducerMap,
-  createReducer, createSelector,
-  MetaReducer, on
-} from '@ngrx/store';
-import { environment } from '../../environments/environment';
+import {ActionReducer, ActionReducerMap, createReducer, createSelector, MetaReducer, on} from '@ngrx/store';
+import {environment} from '../../environments/environment';
 import {Channel} from "./model/Channel";
-import {channelCreated, channelCreationFailure, connected, connectionFailure, createChannel} from "./actions";
+import {
+  addIncomingMessage, addOutgoingMessage, addSystemMessage,
+  channelCreated,
+  channelCreationFailure,
+  connected,
+  connectionFailure, connectToChannel,
+  createChannel,
+  ecdhKeyArrived
+} from "./actions";
+import {IncomingMessage, Message, OutgoingMessage, SystemMessage} from "./model/Message";
 
 export interface State {
   appState: AppState;
 }
 
 export interface AppState {
+  channelName: string,
   channel: Channel,
+  messages: Message[],
   errorCode: string
 }
 
 const initialState: AppState = {
+  channelName: null,
   channel: null,
+  messages: [],
   errorCode: null
 }
 
-export const appStateReducers = createReducer(
+export const appStateReducers = createReducer<AppState>(
   initialState,
-  on(channelCreated, (_, { channelName }) => ({ channel: new Channel(channelName, true), errorCode: null})),
-  on(channelCreationFailure, (state, { errorCode}) => ({...state, errorCode: errorCode})),
-  on(connected, (state, { channelName}) => ({ channel: new Channel(channelName, false), errorCode: null})),
-  on(connectionFailure, (state, {errorCode}) => ({...state, errorCode: errorCode}))
+  on(createChannel, (state, {channelName}) => ({...state, channelName: channelName})),
+  on(channelCreated, (state, {channelName}) => ({
+    ...state,
+    channel: new Channel(state.channelName, true),
+    messages: [new SystemMessage("Waiting for someone to join...")],
+    errorCode: null
+  })),
+  on(channelCreationFailure, (state, {errorCode}) => ({...state, errorCode: errorCode})),
+  on(connectToChannel, (state, {channelName}) => ({...state, channelName: channelName})),
+  on(connected, (state, {channelName}) =>({
+    ...state,
+    channel: new Channel(state.channelName, false),
+    messages: [new SystemMessage("Connected...")],
+    errorCode: null
+  })),
+  on(connectionFailure, (state, {errorCode}) => ({...state, errorCode: errorCode})),
+  on(ecdhKeyArrived, (state, {pubkey}) => {
+    let channel = Channel.withOtherPubKey(state.channel, pubkey);
+    return {
+      ...state,
+      channel: channel,
+      messages: [
+        ...state.messages,
+        new SystemMessage("ECDH complete, channel is now secure!"),
+        new SystemMessage(`Channel fingerprint: ${channel.getFingerprint()}`)
+      ]};
+  }),
+  on(addSystemMessage, (state, {content}) => ({
+    ...state,
+    messages: [...state.messages, new SystemMessage(content)]
+  })),
+  on(addIncomingMessage, (state, {cyphertext}) => ({
+    ...state,
+    messages: [...state.messages, new IncomingMessage(state.channel.decrypt(cyphertext))]
+  })),
+  on(addOutgoingMessage, (state, {content}) => ({
+    ...state,
+    messages: [...state.messages, new OutgoingMessage(content)]
+  }))
 )
 
 // const channelsReducer = createReducer(
@@ -41,6 +84,10 @@ export const reducers: ActionReducerMap<State> = {
 };
 
 export const selectAppState = (state: State) => state.appState
+export const selectChannel = createSelector(
+  selectAppState,
+  s => s.channel
+)
 
 export const metaReducers: MetaReducer<State>[] = !environment.production ? [logger] : [];
 
