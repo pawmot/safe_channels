@@ -50,7 +50,7 @@ export class ChannelsService {
     this.pingTimeoutId = <number><unknown>setTimeout(() => {
       this.pingTimeoutId = null;
       this.sendToServer(new PingCommand())
-    }, 5000);
+    }, 5*60*1000);
   }
 
   private handleMessage(ev: MessageEvent) {
