@@ -1,0 +1,12 @@
+button {
+  margin: 5px;
+}
+
+.container {
+  height: 100%;
+
+  display:flex;
+  flex-flow: column;
+  justify-content:center;
+  align-items:center;
+}

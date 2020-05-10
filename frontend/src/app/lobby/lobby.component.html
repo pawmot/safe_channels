@@ -1,17 +1,19 @@
-<div *ngIf="error">
-  <p class="error">{{error}}</p>
-</div>
-<div *ngIf="!inChannel">
-  <label for="channelName">Channel name</label>
-  <input id="channelName" [(ngModel)]="channelName" type="text"/>
-  <br>
-  <button (click)="connect()" [disabled]="!channelName">Connect</button>
-  <button (click)="create()" [disabled]="!channelName">Create</button>
-</div>
-<div *ngIf="inChannel">
-  <label for="message">Message</label>
-  <input id="message" [(ngModel)]="message" type="text" [disabled]="!connected">
-  <button (click)="sendMessage()" [disabled]="!connected">Send</button>
-  <p *ngFor="let line of lines" [innerHTML]="line.text | linkify">
-  </p>
-</div>
+<mat-sidenav-container fullscreen>
+  <mat-sidenav opened disableClose mode="side">
+    <app-channels-list
+      [channels$]="channelsToDisplay$"
+      (connectToChannel)="connectToChannel()"
+      (createChannel)="createChannel()"
+      (channelSelected)="handleChannelSelected($event)">
+    </app-channels-list>
+  </mat-sidenav>
+  <mat-sidenav-content>
+    <app-channel *ngIf="selectedChannel"
+                 (messageSent)="handleMessageSent($event)"
+                 [messages]="messagesToDisplay$ | async"
+                 [connected]="connected$ | async"></app-channel>
+    <app-no-channel *ngIf="!selectedChannel"
+                    (connectToChannel)="connectToChannel()"
+                    (createChannel)="createChannel()"></app-no-channel>
+  </mat-sidenav-content>
+</mat-sidenav-container>

@@ -1,9 +1,21 @@
 import "source-map-support/register";
 import {APIGatewayProxyEvent, Handler} from "aws-lambda";
-import {DynamoDB, ApiGatewayManagementApi} from "aws-sdk";
+import {ApiGatewayManagementApi, DynamoDB} from "aws-sdk";
 import {DocumentClient} from "aws-sdk/lib/dynamodb/document_client";
-import PutItemInput = DocumentClient.PutItemInput;
 import * as util from "util";
+import {
+    channelClosedMessage,
+    ClientBinaryExchangeMessage,
+    ConnectToChannelMessage,
+    ConnectToChannelResultCode,
+    connectToChannelResultMessage,
+    CreateChannelMessage,
+    CreateChannelResultCode,
+    createChannelResultMessage,
+    CreateChannelResultMessage,
+    PONG_MESSAGE
+} from "../commands";
+import PutItemInput = DocumentClient.PutItemInput;
 import GetItemInput = DocumentClient.GetItemInput;
 import Key = DocumentClient.Key;
 
@@ -19,7 +31,7 @@ export const handleConnection: Handler<APIGatewayProxyEvent> = async (ev): Promi
 }
 
 export const handlePing: Handler<APIGatewayProxyEvent> = async (ev): Promise<APIGatewayWebsocketResult> => {
-    sendMessageToClient(getCallbackUrl(ev), ev.requestContext.connectionId, new Result(ResultCodes.PONG));
+    await sendMessageToClient(getCallbackUrl(ev), ev.requestContext.connectionId, PONG_MESSAGE);
 
     return {
         statusCode: 200
@@ -38,7 +50,7 @@ export const handleDisconnection: Handler<APIGatewayProxyEvent> = async (ev): Pr
             TableName: tableName,
             ExclusiveStartKey: startKey,
             FilterExpression: "contains(connectionIds, :id)",
-            ExpressionAttributeValues: { ":id": ev.requestContext.connectionId }
+            ExpressionAttributeValues: {":id": ev.requestContext.connectionId}
         }).promise();
 
         if (result.LastEvaluatedKey) {
@@ -47,7 +59,7 @@ export const handleDisconnection: Handler<APIGatewayProxyEvent> = async (ev): Pr
             finished = true;
         }
 
-        for(let i = 0; i < result.Items.length; i++) {
+        for (let i = 0; i < result.Items.length; i++) {
             const item = result.Items[0];
             const channel: Channel = {
                 channelName: <string>item["channelName"],
@@ -55,11 +67,8 @@ export const handleDisconnection: Handler<APIGatewayProxyEvent> = async (ev): Pr
                 createdAt: new Date(item["createdAt"]),
                 connectionIds: <string[]>(item["connectionIds"].values)
             }
-            if(!channel.isOpen) {
-                const msg: CloseChannelCommand = {
-                    action: "closeChannel",
-                    channelName: channel.channelName
-                };
+            if (!channel.isOpen) {
+                const msg = channelClosedMessage(channel.channelName);
                 await sendMessageToClient(getCallbackUrl(ev), channel.connectionIds.filter(cid => cid !== ev.requestContext.connectionId)[0], msg)
             }
             await ddb.delete({
@@ -78,8 +87,12 @@ export const handleDisconnection: Handler<APIGatewayProxyEvent> = async (ev): Pr
 }
 
 export const handleCreateChannel: Handler<APIGatewayProxyEvent> = async (ev): Promise<APIGatewayWebsocketResult> => {
-    const cmd = <CreateChannelCommand>JSON.parse(ev.body);
+    const cmd = <CreateChannelMessage>JSON.parse(ev.body);
     console.log(`${ev.requestContext.connectionId} is creating channel ${cmd.channelName}`);
+
+    function result(code: CreateChannelResultCode): CreateChannelResultMessage {
+        return createChannelResultMessage(cmd.channelName, code);
+    }
 
     const input: PutItemInput = {
         Item: {
@@ -98,7 +111,7 @@ export const handleCreateChannel: Handler<APIGatewayProxyEvent> = async (ev): Pr
         await sendMessageToClient(
             getCallbackUrl(ev),
             ev.requestContext.connectionId,
-            new Result(ResultCodes.CHANNEL_CREATED)
+            result(CreateChannelResultCode.CHANNEL_CREATED)
         );
 
         return {
@@ -109,7 +122,7 @@ export const handleCreateChannel: Handler<APIGatewayProxyEvent> = async (ev): Pr
             await sendMessageToClient(
                 getCallbackUrl(ev),
                 ev.requestContext.connectionId,
-                new Result(ResultCodes.CHANNEL_NAME_ALREADY_TAKEN)
+                result(CreateChannelResultCode.CHANNEL_NAME_ALREADY_TAKEN)
             );
             return {
                 statusCode: 200
@@ -119,7 +132,7 @@ export const handleCreateChannel: Handler<APIGatewayProxyEvent> = async (ev): Pr
             await sendMessageToClient(
                 getCallbackUrl(ev),
                 ev.requestContext.connectionId,
-                new Result(ResultCodes.SOMETHING_WENT_WRONG)
+                result(CreateChannelResultCode.SOMETHING_WENT_WRONG)
             );
             return {
                 statusCode: 200
@@ -129,11 +142,11 @@ export const handleCreateChannel: Handler<APIGatewayProxyEvent> = async (ev): Pr
 }
 
 export const handleConnectToChannel: Handler<APIGatewayProxyEvent> = async (ev): Promise<APIGatewayWebsocketResult> => {
-    const cmd = <ConnectToChannelCommand>JSON.parse(ev.body);
+    const cmd = <ConnectToChannelMessage>JSON.parse(ev.body);
     console.log(`${ev.requestContext.connectionId} is connecting to channel ${cmd.channelName}`);
 
     const input: GetItemInput = {
-        Key: { "channelName" : cmd.channelName},
+        Key: {"channelName": cmd.channelName},
         TableName: tableName
     }
 
@@ -141,7 +154,10 @@ export const handleConnectToChannel: Handler<APIGatewayProxyEvent> = async (ev):
     const result = await ddb.get(input).promise();
 
     if (!result.Item) {
-        await sendMessageToClient(getCallbackUrl(ev), ev.requestContext.connectionId, new Result(ResultCodes.WRONG_CHANNEL))
+        await sendMessageToClient(
+            getCallbackUrl(ev),
+            ev.requestContext.connectionId,
+            connectToChannelResultMessage(cmd.channelName, ConnectToChannelResultCode.WRONG_CHANNEL))
         return {
             statusCode: 200
         }
@@ -155,18 +171,27 @@ export const handleConnectToChannel: Handler<APIGatewayProxyEvent> = async (ev):
     }
 
     if (!channel.isOpen) {
-        await sendMessageToClient(getCallbackUrl(ev), ev.requestContext.connectionId, new Result(ResultCodes.WRONG_CHANNEL))
+        await sendMessageToClient(
+            getCallbackUrl(ev),
+            ev.requestContext.connectionId,
+            connectToChannelResultMessage(cmd.channelName, ConnectToChannelResultCode.WRONG_CHANNEL))
         return {
             statusCode: 200
         }
     }
 
-    await sendMessageToClient(getCallbackUrl(ev), channel.connectionIds[0], cmd);
-    await sendMessageToClient(getCallbackUrl(ev), ev.requestContext.connectionId, new Result(ResultCodes.CONNECTED));
+    await sendMessageToClient(
+        getCallbackUrl(ev),
+        channel.connectionIds[0],
+        connectToChannelResultMessage(cmd.channelName, ConnectToChannelResultCode.CONNECTED));
+    await sendMessageToClient(
+        getCallbackUrl(ev),
+        ev.requestContext.connectionId,
+        connectToChannelResultMessage(cmd.channelName, ConnectToChannelResultCode.CONNECTED));
 
     await ddb.update({
         TableName: tableName,
-        Key: { "channelName" : cmd.channelName},
+        Key: {"channelName": cmd.channelName},
         AttributeUpdates: {
             "isOpen": {
                 Value: false
@@ -186,10 +211,10 @@ export const handleConnectToChannel: Handler<APIGatewayProxyEvent> = async (ev):
 }
 
 export const handleMessage: Handler<APIGatewayProxyEvent> = async (ev): Promise<APIGatewayWebsocketResult> => {
-    const cmd = <MessageCommand>JSON.parse(ev.body);
+    const cmd = <ClientBinaryExchangeMessage>JSON.parse(ev.body);
 
     const input: GetItemInput = {
-        Key: { "channelName" : cmd.channelName},
+        Key: {"channelName": cmd.channelName},
         TableName: tableName
     }
 
@@ -233,42 +258,6 @@ interface Channel {
     isOpen: boolean;
     createdAt: Date;
     connectionIds: string[];
-}
-
-interface CloseChannelCommand {
-    action: "closeChannel";
-    channelName: string;
-}
-
-interface CreateChannelCommand {
-    action: "createChannel";
-    channelName: string;
-}
-
-interface ConnectToChannelCommand {
-    action: "connectToChannel";
-    channelName: string;
-}
-
-interface MessageCommand {
-    action: "message";
-    channelName: string;
-    type: 0 | 1;
-    encodedMsg: string;
-}
-
-class Result {
-    constructor(public code: ResultCodes) {
-    }
-}
-
-enum ResultCodes {
-    CHANNEL_CREATED,
-    CONNECTED,
-    CHANNEL_NAME_ALREADY_TAKEN,
-    WRONG_CHANNEL,
-    PONG,
-    SOMETHING_WENT_WRONG
 }
 
 interface APIGatewayWebsocketResult {

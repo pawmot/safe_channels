@@ -1,0 +1,52 @@
+.container {
+  height: 100%;
+
+  display: flex;
+  flex-flow: column;
+}
+
+.messages {
+  padding: 10px;
+  flex-grow: 1;
+  display: flex;
+  flex-flow: column;
+}
+
+.newMessageArea {
+  display: flex;
+  flex-flow: row;
+
+  input {
+    flex-grow: 1;
+  }
+}
+
+a, a:link, a:visited, a:focus, a:hover, a:active {
+  color: white !important;
+}
+
+.message {
+  border-radius: 20px;
+  padding: 8px 15px;
+  margin-top: 5px;
+  margin-bottom: 5px;
+  display: inline-block;
+}
+
+.system {
+  font-style: italic;
+  align-self: center;
+  background-color: #444;
+}
+
+.incoming {
+  border-top-left-radius: 5px;
+  background-color: #094;
+  align-self: flex-start;
+}
+
+.outgoing {
+  border-bottom-right-radius: 5px;
+  background-color: #05b;
+  align-self: flex-end;
+}

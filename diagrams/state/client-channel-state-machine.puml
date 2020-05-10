@@ -1,0 +1,17 @@
+@startuml
+scale 600 width
+[*] -> CreationPending
+[*] -> ConnectionPending
+
+CreationPending --> Error
+ConnectionPending --> Error
+
+CreationPending -> Created
+Created --> Ecdh
+
+ConnectionPending --> Ecdh
+
+Ecdh --> EcdhError
+Ecdh --> Connected
+Connected --> Closed
+@enduml

@@ -1,10 +1,15 @@
 import {Component, OnInit} from '@angular/core';
+import {MatDialog} from "@angular/material/dialog";
+import {ChannelDialogComponent, Mode} from "../channel-dialog/channel-dialog.component";
+import {State} from "../store";
 import {Store} from "@ngrx/store";
-import {selectAppState, State} from "../reducers";
-import {addOutgoingMessage, connectToChannel, createChannel} from "../reducers/actions";
-import {ChannelsService} from "../channels.service";
-import {ChannelState} from "../reducers/model/Channel";
-import {IncomingMessage, OutgoingMessage, SystemMessage} from "../reducers/model/Message";
+import {Observable} from "rxjs";
+import {Channel, ChannelState} from "../store/channels/channels.model";
+import {selectAllChannels, selectChannelByName} from "../store/channels/channels.selectors";
+import {map} from "rxjs/operators";
+import {Message} from "../store/messages/messages.model";
+import {selectMessagesByChannel} from "../store/messages/messages.selectors";
+import {addOutgoingMessage} from "../store/messages/messages.actions";
 
 @Component({
   selector: 'app-lobby',
@@ -12,65 +17,50 @@ import {IncomingMessage, OutgoingMessage, SystemMessage} from "../reducers/model
   styleUrls: ['./lobby.component.scss']
 })
 export class LobbyComponent implements OnInit {
-  channelName: string;
-  lines: Line[] = [];
-  inChannel: boolean;
-  connected: boolean;
-  error?: string;
-  message: string = "";
+  selectedChannel: string = null;
+  channelsToDisplay$: Observable<Channel[]>;
+  messagesToDisplay$: Observable<Message[]>;
+  connected$: Observable<boolean>;
 
-  constructor(private store: Store<State>, private channelsService: ChannelsService) {
-    store.select(selectAppState).subscribe(state => {
-      this.error = state.errorCode;
-      if (state.channel) {
-        this.inChannel = true;
-        this.connected = state.channel.state === ChannelState.CONNECTED;
-      } else {
-        this.inChannel = false;
+  constructor(private dialog: MatDialog, private store: Store<State>) {
+    this.channelsToDisplay$ = this.store.select(selectAllChannels).pipe(
+      map(cs => cs.filter(c => c.state > ChannelState.Error))
+    );
+  }
+
+  ngOnInit() {
+
+  }
+
+  connectToChannel() {
+    this.dialog.open(ChannelDialogComponent, {
+      minWidth: 350,
+      disableClose: true,
+      data: {
+        mode: Mode.CONNECT
       }
-      this.lines = state.messages.map(m => {
-        switch (true) {
-          case m instanceof SystemMessage:
-            return new Line(m.content);
-
-          case m instanceof IncomingMessage:
-            return new Line(`<<< ${m.content}`);
-
-          case m instanceof OutgoingMessage:
-            return new Line(`>>> ${m.content}`);
-        }
-      })
-    })
+    });
   }
 
-  ngOnInit(): void {
-    this.channelsService.connect({
-      handleClosing: this.handleClosingSocket.bind(this)
-    })
+  createChannel() {
+    this.dialog.open(ChannelDialogComponent, {
+      minWidth: 350,
+      disableClose: true,
+      data: {
+        mode: Mode.CREATE
+      }
+    });
   }
 
-  connect() {
-    this.store.dispatch(connectToChannel({channelName: this.channelName}));
+  handleChannelSelected(channelName: string) {
+    this.selectedChannel = channelName;
+    if (channelName) {
+      this.messagesToDisplay$ = this.store.select(selectMessagesByChannel(channelName));
+      this.connected$ = this.store.select(selectChannelByName(channelName)).pipe(map(c => c.state === ChannelState.Connected));
+    }
   }
 
-  create() {
-    this.store.dispatch(createChannel({channelName: this.channelName}));
-  }
-
-  private handleClosingSocket() {
-    this.inChannel = false;
-    this.channelName = "";
-    this.message = "";
-  }
-
-  sendMessage() {
-    this.store.dispatch(addOutgoingMessage({content: this.message}));
-    this.message = "";
-  }
-
-}
-
-class Line {
-  constructor(public text: string) {
+  handleMessageSent(message: string) {
+    this.store.dispatch(addOutgoingMessage({channelName: this.selectedChannel, content: message}));
   }
 }

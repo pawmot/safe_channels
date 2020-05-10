@@ -1,0 +1,14 @@
+<h1 mat-dialog-title *ngIf="data.mode === Mode.CREATE">Create a channel</h1>
+<h1 mat-dialog-title *ngIf="data.mode === Mode.CONNECT">Connect to a channel</h1>
+<div mat-dialog-content>
+  <p>Please provide a channel name</p>
+  <mat-form-field appearance="fill">
+    <mat-label>Channel name</mat-label>
+    <input matInput [formControl]="channelName">
+    <mat-error>{{error}}</mat-error>
+  </mat-form-field>
+</div>
+<div mat-dialog-actions>
+  <button mat-button (click)="close()">Cancel</button>
+  <button mat-button (click)="performAction()" color="primary">{{ data.mode === Mode.CONNECT ? 'Connect' : 'Create' }}</button>
+</div>

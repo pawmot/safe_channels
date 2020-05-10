@@ -1,0 +1,24 @@
+button {
+  margin: 5px;
+}
+
+.container {
+  height: 100%;
+
+  display:flex;
+  flex-flow: column;
+  justify-content:center;
+  align-items:center;
+}
+
+mat-action-list {
+  flex-grow: 1;
+}
+
+hr {
+  width: 90%;
+}
+
+.selected {
+  font-weight: bolder;
+}

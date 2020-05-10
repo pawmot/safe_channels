@@ -1,1 +1,9 @@
-<p>channel works!</p>
+<div class="container">
+  <div class="messages">
+    <div *ngFor="let msg of messages" class="message" [ngClass]="getType(msg)" [innerHTML]="msg.content | linkify"></div>
+  </div>
+  <div class="newMessageArea">
+    <input matInput placeholder="Enter message" title="Message" [disabled]="!connected" [(ngModel)]="message">
+    <button mat-stroked-button [disabled]="!connected || !message" color="primary" (click)="sendMessage()" (keyup.enter)="sendMessage()">Send</button>
+  </div>
+</div>

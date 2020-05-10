@@ -16,7 +16,7 @@ provider:
   region: eu-west-1
   stage: ${opt:stage, 'dev'}
   websocketsApiName: ${self:provider.stage}-safe-channels-ws-api
-  websocketsApiRouteSelectionExpression: $request.body.action
+  websocketsApiRouteSelectionExpression: $request.body.type
   apiGateway:
     minimumCompressionSize: 1024
   environment:
@@ -90,7 +90,7 @@ functions:
     handler: fn/socket.handleMessage
     events:
       - websocket:
-          route: message
+          route: clientBinaryExchange
     environment:
       CHANNELS_TABLE: ${self:provider.stage}-channels
 

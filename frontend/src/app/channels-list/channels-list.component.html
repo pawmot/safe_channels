@@ -1,0 +1,13 @@
+<div class="container">
+  <div class="button-row">
+    <button mat-stroked-button color="accent" (click)="createChannel.emit()">Create</button>
+    <button mat-stroked-button (click)="connectToChannel.emit()">Connect</button>
+  </div>
+  <hr>
+  <mat-action-list>
+    <button *ngFor="let c of channels" mat-list-item (click)="selectChannel(c.name)">
+      <span [class.selected]="c.name === this.selectedChannel">{{ c.name }}</span>
+    </button>
+  </mat-action-list>
+</div>
+

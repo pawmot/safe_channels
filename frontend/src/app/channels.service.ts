@@ -1,15 +1,40 @@
 import {Injectable} from '@angular/core';
 import {environment} from "../environments/environment";
-import {AppState} from "./reducers";
+import {State} from "./store";
 import {Store} from "@ngrx/store";
 import {
-  addIncomingMessage,
-  addSystemMessage,
+  CHANNEL_CLOSED_MESSAGE_TYPE, ChannelClosedMessage,
+  CLIENT_BINARY_EXCHANGE_MESSAGE_TYPE,
+  clientBinaryExchangeMessage,
+  ClientBinaryExchangeMessage,
+  CONNECT_TO_CHANNEL_RESULT_MESSAGE_TYPE,
+  connectToChannelMessage,
+  ConnectToChannelResultCode,
+  ConnectToChannelResultMessage,
+  CREATE_CHANNEL_RESULT_MESSAGE_TYPE,
+  createChannelMessage,
+  CreateChannelResultCode,
+  CreateChannelResultMessage,
+  Message,
+  PING_MESSAGE
+} from "../../../commands";
+import {
+  channelClosed,
   channelCreated,
-  channelCreationFailure, closeChannel,
+  channelCreationFailed,
   connected,
-  connectionFailure, ecdhKeyArrived, otherConnected
-} from "./reducers/actions";
+  connectionFailed,
+  cryptoData
+} from "./store/channels/channels.actions";
+import {addIncomingMessage, addSystemMessage} from "./store/messages/messages.actions";
+import {selectChannelByName} from "./store/channels/channels.selectors";
+import {take} from "rxjs/operators";
+import {ec as EC} from "elliptic";
+import * as hash from "hash.js";
+import {ChannelState} from "./store/channels/channels.model";
+import {Counter, ModeOfOperation, utils} from "aes-js";
+import hex = utils.hex;
+import utf8 = utils.utf8;
 
 @Injectable({
   providedIn: 'root'
@@ -19,26 +44,29 @@ export class ChannelsService {
   socket: WebSocket;
   private pingTimeoutId?: number = null;
   private connected = false;
+  private ec = new EC("curve25519");
+  private keypairs = new Map<string, EC.KeyPair>();
 
-  constructor(private store: Store<AppState>) {
+  constructor(private store: Store<State>) {
   }
 
-  connect(handler: Handler) {
-    this.createSocket(handler);
+  connect() {
+    this.createSocket();
   }
 
-  private createSocket(handler: Handler) {
+  private createSocket() {
     this.socket = new WebSocket(environment.wssAddress);
     this.connected = true;
     this.socket.onmessage = this.handleMessage.bind(this);
     this.socket.onclose = (ev) => {
       this.connected = false;
-      handler.handleClosing(ev);
+      // TODO: dispatch appropriate message
+      //handler.handleClosing(ev);
     }
     this.pingTimeoutId = <number><unknown>setTimeout(() => {
       this.pingTimeoutId = null;
-      this.sendToServer(new PingCommand())
-    }, 5000);
+      this.sendToServer(PING_MESSAGE)
+    }, 5 * 60 * 1000);
   }
 
   private sendToServer(message: any) {
@@ -49,139 +77,124 @@ export class ChannelsService {
     }
     this.pingTimeoutId = <number><unknown>setTimeout(() => {
       this.pingTimeoutId = null;
-      this.sendToServer(new PingCommand())
-    }, 5*60*1000);
+      this.sendToServer(PING_MESSAGE)
+    }, 5 * 60 * 1000);
   }
 
-  private handleMessage(ev: MessageEvent) {
-    let result = <Result>JSON.parse(ev.data);
-    if (result.code !== undefined && result.code !== null) {
-      switch (result.code) {
-        case ResultCodes.CHANNEL_CREATED:
-          this.store.dispatch(channelCreated({channelName: "TODO"}));
-          break;
-
-        case ResultCodes.CHANNEL_NAME_ALREADY_TAKEN:
-          this.store.dispatch(channelCreationFailure({channelName: "TODO", errorCode: "channels.err.nameTaken"}));
-          break;
-
-        case ResultCodes.SOMETHING_WENT_WRONG:
-          this.store.dispatch(channelCreationFailure({
-            channelName: "TODO",
-            errorCode: "channels.err.somethingWentWrong"
-          }));
-          break;
-
-        case ResultCodes.CONNECTED:
-          this.store.dispatch(connected({channelName: "TODO"}));
-          break;
-
-        case ResultCodes.WRONG_CHANNEL:
-          this.store.dispatch(connectionFailure({channelName: "TODO", errorCode: "channels.err.wrongChannel"}));
-          break;
-
-        case ResultCodes.PONG:
-          return;
-      }
-      return;
-    }
-
-    let cmd = <Command>JSON.parse(ev.data);
-    switch (cmd.action) {
-      case "connectToChannel":
-        this.store.dispatch(otherConnected({channelName: (<ConnectToChannelCommand>cmd).channelName }));
-        break;
-
-      case "message":
-        let msg = <MessageCommand>cmd;
-        switch (msg.type) {
-          case MessageType.ECDH:
-            this.store.dispatch(ecdhKeyArrived({pubkey: msg.encodedMsg}));
+  private async handleMessage(ev: MessageEvent) {
+    let message = <Message>JSON.parse(ev.data);
+    switch (message.type) {
+      case CREATE_CHANNEL_RESULT_MESSAGE_TYPE: {
+        let result = <CreateChannelResultMessage>message;
+        switch (result.code) {
+          case CreateChannelResultCode.CHANNEL_CREATED:
+            this.store.dispatch(channelCreated({channelName: result.channelName}));
+            this.store.dispatch(addSystemMessage({
+              channelName: result.channelName,
+              content: "Waiting for someone to join..."
+            }));
             break;
 
-          case MessageType.Regular:
-            this.store.dispatch(addIncomingMessage({cyphertext: msg.encodedMsg}));
+          case CreateChannelResultCode.CHANNEL_NAME_ALREADY_TAKEN:
+            this.store.dispatch(channelCreationFailed({channelName: result.channelName, reason: "nameAlreadyTaken"}));
+            break;
+
+          case CreateChannelResultCode.SOMETHING_WENT_WRONG:
+            this.store.dispatch(channelCreationFailed({channelName: result.channelName, reason: "somethingWentWrong"}));
+            break;
         }
+      }
         break;
 
-      case "closeChannel":
-        this.store.dispatch(closeChannel({channelName: "TODO"}));
+      case CONNECT_TO_CHANNEL_RESULT_MESSAGE_TYPE: {
+        let result = <ConnectToChannelResultMessage>message;
+        switch (result.code) {
+          case ConnectToChannelResultCode.CONNECTED:
+            const chan = await this.store.select(selectChannelByName(result.channelName)).pipe(take(1)).toPromise();
+            if (chan.state !== ChannelState.Connecting && chan.state !== ChannelState.Created) {
+              console.log(`Got a CONNECTED message, but channel ${chan.name} is already connected. Ignoring the message.`);
+              return;
+            }
+            const keypair = this.ec.genKeyPair();
+            this.keypairs.set(result.channelName, keypair);
+            this.sendToServer(clientBinaryExchangeMessage(chan.name, keypair.getPublic().encodeCompressed("hex"), true));
+            this.store.dispatch(connected({channelName: result.channelName}));
+            this.store.dispatch(addSystemMessage({channelName: result.channelName, content: "Connected..."}));
+            this.store.dispatch(addSystemMessage({
+              channelName: result.channelName,
+              content: "ECDH key exchange initiated, waiting for public key from second party..."
+            }));
+            break;
+
+          case ConnectToChannelResultCode.WRONG_CHANNEL:
+            this.store.dispatch(connectionFailed({channelName: result.channelName, reason: "wrongChannel"}));
+            break;
+
+          case ConnectToChannelResultCode.SOMETHING_WENT_WRONG:
+            this.store.dispatch(connectionFailed({channelName: result.channelName, reason: "somethingWentWrong"}));
+            break;
+        }
+        break;
+      }
+
+      case CLIENT_BINARY_EXCHANGE_MESSAGE_TYPE: {
+        let result = <ClientBinaryExchangeMessage>message;
+        const chan = await this.store.select(selectChannelByName(result.channelName)).pipe(take(1)).toPromise();
+        if (result.ecdh) {
+          if (chan.state !== ChannelState.Ecdh) {
+            console.log(`Got an ECDH message, but the ${chan.name} channel already has a shared key. Ignoring the message`);
+            return;
+          }
+          const otherKey = this.ec.keyFromPublic(result.binaryContent, "hex");
+          let keypair = this.keypairs.get(result.channelName);
+          const derivedKey = keypair.derive(otherKey.getPublic());
+          const sharedKey = hash.sha256().update(derivedKey.toString(16)).digest();
+          const localPubKey = keypair.getPublic().encodeCompressed("hex");
+          const fingerprint = hash.sha1().update(
+            localPubKey <= result.binaryContent ? localPubKey + result.binaryContent : result.binaryContent + localPubKey)
+            .digest("hex").substr(0, 5);
+          this.store.dispatch(cryptoData({
+            channelName: result.channelName,
+            sharedKey: sharedKey,
+            fingerprint: fingerprint,
+            localPubKey: localPubKey,
+            remotePubKey: result.binaryContent
+          }));
+          this.store.dispatch(addSystemMessage({channelName: chan.name, content: "ECDH complete, channel is now secure!" }));
+          this.store.dispatch(addSystemMessage({channelName: chan.name, content: `Channel fingerprint: ${fingerprint}`}));
+          this.keypairs.delete(result.channelName);
+        } else {
+          const cipherText = hex.toBytes(result.binaryContent);
+          let aesCtr = new ModeOfOperation.ctr(chan.sharedKey, new Counter(5))
+          const decryptedBytes = aesCtr.decrypt(cipherText);
+          let msg = utf8.fromBytes(decryptedBytes);
+          this.store.dispatch(addIncomingMessage({channelName: result.channelName, content: msg}));
+        }
+        break;
+      }
+
+      case CHANNEL_CLOSED_MESSAGE_TYPE:
+        let result = <ChannelClosedMessage>message;
+        this.store.dispatch(channelClosed({channelName: result.channelName}));
+        this.store.dispatch(addSystemMessage({channelName: result.channelName, content: "Channel closed"}));
         break;
     }
   }
 
   public createChannel(channelName: string) {
-    this.sendToServer(new CreateChannelCommand(channelName));
+    this.sendToServer(createChannelMessage(channelName));
   }
 
   public connectToChannel(channelName: string) {
-    this.sendToServer(new ConnectToChannelCommand(channelName));
+    this.sendToServer(connectToChannelMessage(channelName));
   }
 
-  public sendEcdhMessage(channelName: string, pubkey: string) {
-    this.sendToServer(new MessageCommand(channelName, MessageType.ECDH, pubkey));
-    this.store.dispatch(addSystemMessage({content:"Initiated ECDH, waiting for public key from second party..."}));
+  public async sendMessage(channelName: string, message: string) {
+    const chan = await this.store.select(selectChannelByName(channelName)).pipe(take(1)).toPromise();
+    let textBytes = utf8.toBytes(message);
+    let aesCtr = new ModeOfOperation.ctr(chan.sharedKey, new Counter(5))
+    let cipherText = aesCtr.encrypt(textBytes);
+    let encryptedMsg = hex.fromBytes(cipherText);
+    this.sendToServer(clientBinaryExchangeMessage(channelName, encryptedMsg));
   }
-
-  public sendMessage(channelName: string, encryptedMsg: string) {
-    this.sendToServer(new MessageCommand(channelName, MessageType.Regular, encryptedMsg));
-  }
-}
-
-export interface Handler {
-  handleClosing: (ev: CloseEvent) => void;
-}
-
-class CreateChannelCommand implements Command {
-  constructor(public channelName: string) {
-  }
-
-  action: "createChannel" = "createChannel";
-}
-
-class ConnectToChannelCommand implements Command {
-  constructor(public channelName: string) {
-  }
-
-  action: "connectToChannel" = "connectToChannel";
-}
-
-class MessageCommand implements Command {
-  constructor(public channelName: string, public type: MessageType, public encodedMsg: string) {
-  }
-
-  action: "message" = "message";
-}
-
-class CloseChannelCommand implements Command {
-  constructor(public channelName: string) {
-  }
-
-  action: "closeChannel" = "closeChannel";
-}
-
-class PingCommand implements Command {
-  action = "ping"
-}
-
-interface Command {
-  action: string
-}
-
-enum MessageType {
-  ECDH,
-  Regular
-}
-
-interface Result {
-  code: ResultCodes;
-}
-
-enum ResultCodes {
-  CHANNEL_CREATED,
-  CONNECTED,
-  CHANNEL_NAME_ALREADY_TAKEN,
-  WRONG_CHANNEL,
-  PONG,
-  SOMETHING_WENT_WRONG
 }

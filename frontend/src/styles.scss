@@ -12,14 +12,14 @@
 // Define the palettes for your theme using the Material Design palettes available in palette.scss
 // (imported above). For each palette, you can optionally specify a default, lighter, and darker
 // hue. Available color palettes: https://material.io/design/color/
-$safe-channels-primary: mat-palette($mat-indigo);
-$safe-channels-accent: mat-palette($mat-pink, A200, A100, A400);
+$safe-channels-primary: mat-palette($mat-blue, A200, A100, A400);
+$safe-channels-accent: mat-palette($mat-green, A200, A100, A400);
 
 // The warn palette is optional (defaults to red).
-$safe-channels-warn: mat-palette($mat-red);
+$safe-channels-warn: mat-palette($mat-red, A200, A100, A400);
 
 // Create the theme object (a Sass map containing all of the palettes).
-$safe-channels-theme: mat-light-theme($safe-channels-primary, $safe-channels-accent, $safe-channels-warn);
+$safe-channels-theme: mat-dark-theme($safe-channels-primary, $safe-channels-accent, $safe-channels-warn);
 
 // Include theme styles for core and each component used in your app.
 // Alternatively, you can import and @include the theme mixins for each component

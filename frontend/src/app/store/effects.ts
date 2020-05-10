@@ -1,11 +1,12 @@
 import {Injectable} from '@angular/core';
-import {act, Actions, createEffect, ofType} from '@ngrx/effects';
+import {Actions, createEffect, ofType, ROOT_EFFECTS_INIT} from '@ngrx/effects';
 import {ChannelsService} from "../channels.service";
-import {addOutgoingMessage, connected, connectToChannel, createChannel, otherConnected} from "./actions";
-import {concatMap, map, tap, withLatestFrom} from "rxjs/operators";
-import {selectChannel, State} from "./index";
+import {State} from "./index";
 import {Store} from "@ngrx/store";
 import {of} from "rxjs";
+import {map, tap} from "rxjs/operators";
+import {connectToChannel, createChannel} from "./channels/channels.actions";
+import {addOutgoingMessage} from "./messages/messages.actions";
 
 @Injectable()
 export class ChannelEffects {
@@ -15,6 +16,13 @@ export class ChannelEffects {
     private store: Store<State>,
     private channelsService: ChannelsService) {
   }
+
+  init$ = createEffect(() => {
+    return this.actions$.pipe(
+      ofType(ROOT_EFFECTS_INIT),
+      tap(_ => this.channelsService.connect())
+    )
+  }, {dispatch: false});
 
   createChannel$ = createEffect(() => {
     return this.actions$.pipe(
@@ -32,27 +40,10 @@ export class ChannelEffects {
     )
   }, {dispatch: false});
 
-  ecdhMessage$ = createEffect(() => {
-    return this.actions$.pipe(
-      ofType(connected, otherConnected),
-      concatMap(action => of(action).pipe(
-        withLatestFrom(this.store.select(selectChannel))
-      )),
-      tap(([action, channel]) => {
-        this.channelsService.sendEcdhMessage(channel.name, channel.getEncodedPublicKey())
-      })
-    )
-  }, {dispatch: false});
-
   sendMessage$ = createEffect(() => {
     return this.actions$.pipe(
       ofType(addOutgoingMessage),
-      concatMap(action => of(action).pipe(
-        withLatestFrom(this.store.select(selectChannel))
-      )),
-      tap(([action, channel]) => {
-        this.channelsService.sendMessage(channel.name, channel.encrypt(action.content))
-      })
+      tap(a => this.channelsService.sendMessage(a.channelName, a.content))
     )
   }, {dispatch: false})
 }
