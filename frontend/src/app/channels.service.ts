@@ -35,6 +35,7 @@ import {ChannelState} from "./store/channels/channels.model";
 import {Counter, ModeOfOperation, utils} from "aes-js";
 import hex = utils.hex;
 import utf8 = utils.utf8;
+import ModeOfOperationCTR = ModeOfOperation.ModeOfOperationCTR;
 
 @Injectable({
   providedIn: 'root'
@@ -46,6 +47,7 @@ export class ChannelsService {
   private connected = false;
   private ec = new EC("curve25519");
   private keypairs = new Map<string, EC.KeyPair>();
+  private cipherPairs = new Map<string, CipherPair>();
 
   constructor(private store: Store<State>) {
   }
@@ -163,10 +165,13 @@ export class ChannelsService {
           this.store.dispatch(addSystemMessage({channelName: chan.name, content: "ECDH complete, channel is now secure!" }));
           this.store.dispatch(addSystemMessage({channelName: chan.name, content: `Channel fingerprint: ${fingerprint}`}));
           this.keypairs.delete(result.channelName);
+          this.cipherPairs.set(chan.name, new CipherPair(
+            new ModeOfOperation.ctr(sharedKey, new Counter(localPubKey <= result.binaryContent ? sharedKey[0] : sharedKey[1])),
+            new ModeOfOperation.ctr(sharedKey, new Counter(localPubKey <= result.binaryContent ? sharedKey[1] : sharedKey[0]))
+          ))
         } else {
           const cipherText = hex.toBytes(result.binaryContent);
-          let aesCtr = new ModeOfOperation.ctr(chan.sharedKey, new Counter(5))
-          const decryptedBytes = aesCtr.decrypt(cipherText);
+          const decryptedBytes = this.cipherPairs.get(chan.name).input.encrypt(cipherText);
           let msg = utf8.fromBytes(decryptedBytes);
           this.store.dispatch(addIncomingMessage({channelName: result.channelName, content: msg}));
         }
@@ -192,9 +197,12 @@ export class ChannelsService {
   public async sendMessage(channelName: string, message: string) {
     const chan = await this.store.select(selectChannelByName(channelName)).pipe(take(1)).toPromise();
     let textBytes = utf8.toBytes(message);
-    let aesCtr = new ModeOfOperation.ctr(chan.sharedKey, new Counter(5))
-    let cipherText = aesCtr.encrypt(textBytes);
+    let cipherText = this.cipherPairs.get(chan.name).output.encrypt(textBytes);
     let encryptedMsg = hex.fromBytes(cipherText);
     this.sendToServer(clientBinaryExchangeMessage(channelName, encryptedMsg));
   }
+}
+
+class CipherPair {
+  constructor(public input: ModeOfOperationCTR, public output: ModeOfOperationCTR) {}
 }

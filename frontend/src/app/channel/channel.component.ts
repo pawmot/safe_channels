@@ -1,4 +1,4 @@
-import {Component, EventEmitter, Input, OnInit, Output} from '@angular/core';
+import {Component, EventEmitter, Input, OnInit, Output, ViewChild} from '@angular/core';
 import {IncomingMessage, Message, OutgoingMessage, SystemMessage} from "../store/messages/messages.model";
 
 @Component({
