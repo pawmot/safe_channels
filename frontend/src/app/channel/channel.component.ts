@@ -1,25 +1,30 @@
-import {Component, EventEmitter, Input, OnInit, Output, ViewChild} from '@angular/core';
+import {AfterViewInit, Component, EventEmitter, Input, Output, ViewChild, ViewEncapsulation} from '@angular/core';
 import {IncomingMessage, Message, OutgoingMessage, SystemMessage} from "../store/messages/messages.model";
 
 @Component({
   selector: 'app-channel',
   templateUrl: './channel.component.html',
-  styleUrls: ['./channel.component.scss']
+  styleUrls: ['./channel.component.scss'],
+  encapsulation: ViewEncapsulation.None
 })
-export class ChannelComponent implements OnInit {
+export class ChannelComponent implements AfterViewInit {
   @Input() messages: Message[];
   @Input() connected: boolean;
+  @Input() selectedChannel: string;
   @Output() messageSent = new EventEmitter<string>();
-  message: string = "";
+  @ViewChild("messageInput") messageInput;
+  drafts = new Map<string, string>();
 
   constructor() { }
 
-  ngOnInit(): void {
+  ngAfterViewInit(): void {
+    this.messageInput.nativeElement.focus();
   }
 
   sendMessage() {
-    this.messageSent.emit(this.message);
-    this.message = "";
+    this.messageSent.emit(this.drafts.get(this.selectedChannel));
+    this.drafts.set(this.selectedChannel, "");
+    this.messageInput.nativeElement.focus();
   }
 
   getType(msg: Message): string {

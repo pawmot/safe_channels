@@ -11,7 +11,8 @@
     <app-channel *ngIf="selectedChannel"
                  (messageSent)="handleMessageSent($event)"
                  [messages]="messagesToDisplay$ | async"
-                 [connected]="connected$ | async"></app-channel>
+                 [connected]="connected$ | async"
+                 [selectedChannel]="selectedChannel"></app-channel>
     <app-no-channel *ngIf="!selectedChannel"
                     (connectToChannel)="connectToChannel()"
                     (createChannel)="createChannel()"></app-no-channel>

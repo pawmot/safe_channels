@@ -1,9 +1,8 @@
 import {Injectable} from '@angular/core';
-import {Actions, createEffect, ofType, ROOT_EFFECTS_INIT} from '@ngrx/effects';
+import {Actions, createEffect, Effect, ofType, ROOT_EFFECTS_INIT} from '@ngrx/effects';
 import {ChannelsService} from "../channels.service";
 import {State} from "./index";
 import {Store} from "@ngrx/store";
-import {of} from "rxjs";
 import {map, tap} from "rxjs/operators";
 import {connectToChannel, createChannel} from "./channels/channels.actions";
 import {addOutgoingMessage} from "./messages/messages.actions";
