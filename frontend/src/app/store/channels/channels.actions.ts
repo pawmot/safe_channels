@@ -42,5 +42,15 @@ export const channelClosed = createAction(
 
 export const cryptoData = createAction(
   "[Channel] Crypto Data",
-  props<{ channelName: string, sharedKey: number[], fingerprint: string, localPubKey: string, remotePubKey: string }>()
+  props<{ channelName: string, fingerprint: string, localPubKey: string, remotePubKey: string }>()
+);
+
+export const newUnreadMessage = createAction(
+  "[Channel] New unread message",
+  props<{ channelName: string }>()
+);
+
+export const markMessagesAsRead = createAction(
+  "[Channel] Mark messages as read",
+  props<{ channelName: string }>()
 );

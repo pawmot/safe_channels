@@ -6,10 +6,11 @@ import {Store} from "@ngrx/store";
 import {Observable} from "rxjs";
 import {Channel, ChannelState} from "../store/channels/channels.model";
 import {selectAllChannels, selectChannelByName} from "../store/channels/channels.selectors";
-import {map} from "rxjs/operators";
+import {map, tap} from "rxjs/operators";
 import {Message} from "../store/messages/messages.model";
 import {selectMessagesByChannel} from "../store/messages/messages.selectors";
 import {addOutgoingMessage} from "../store/messages/messages.actions";
+import {markMessagesAsRead} from "../store/channels/channels.actions";
 
 @Component({
   selector: 'app-lobby',
@@ -24,6 +25,9 @@ export class LobbyComponent implements OnInit {
 
   constructor(private dialog: MatDialog, private store: Store<State>) {
     this.channelsToDisplay$ = this.store.select(selectAllChannels).pipe(
+      tap(cs =>
+        cs.filter(c => c.name === this.selectedChannel && c.unreadCount > 0)
+          .forEach(c => this.store.dispatch(markMessagesAsRead({channelName: c.name})))),
       map(cs => cs.filter(c => c.state > ChannelState.Error))
     );
   }

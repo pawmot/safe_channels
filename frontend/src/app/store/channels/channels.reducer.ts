@@ -10,7 +10,7 @@ import {
   connectionFailed,
   connectToChannel,
   createChannel,
-  cryptoData
+  cryptoData, markMessagesAsRead, newUnreadMessage
 } from "./channels.actions";
 
 export interface ChannelsState extends EntityState<Channel> {
@@ -29,10 +29,10 @@ const reducer = createReducer<ChannelsState>(
       name: channelName,
       state: ChannelState.CreationPending,
       error: null,
-      sharedKey: null,
       fingerprint: null,
       localPubKey: null,
-      remotePubKey: null
+      remotePubKey: null,
+      unreadCount: 0
     }, state)),
   on(channelCreationFailed, (state, {channelName, reason}) =>
     adapter.updateOne({id: channelName, changes: {state: ChannelState.Error, error: reason}}, state)),
@@ -44,20 +44,19 @@ const reducer = createReducer<ChannelsState>(
       name: channelName,
       state: ChannelState.Connecting,
       error: null,
-      sharedKey: null,
       fingerprint: null,
       localPubKey: null,
-      remotePubKey: null
+      remotePubKey: null,
+      unreadCount: 0
     }, state)),
   on(connectionFailed, (state, {channelName, reason}) =>
     adapter.updateOne({id: channelName, changes: {state: ChannelState.Error, error: reason}}, state)),
   on(connected, (state, {channelName}) =>
     adapter.updateOne({id: channelName, changes: {state: ChannelState.Ecdh}}, state)),
-  on(cryptoData, (state, {channelName, sharedKey, fingerprint, localPubKey, remotePubKey}) => {
+  on(cryptoData, (state, {channelName, fingerprint, localPubKey, remotePubKey}) => {
     return adapter.updateOne({
       id: channelName,
       changes: {
-        sharedKey: sharedKey,
         fingerprint: fingerprint,
         localPubKey: localPubKey,
         remotePubKey: remotePubKey,
@@ -66,7 +65,13 @@ const reducer = createReducer<ChannelsState>(
     }, state);
   }),
   on(channelClosed, (state, {channelName}) =>
-    adapter.updateOne({id: channelName, changes: {state: ChannelState.Closed}}, state))
+    adapter.updateOne({id: channelName, changes: {state: ChannelState.Closed}}, state)),
+  on(newUnreadMessage, (state, {channelName}) => {
+    const channel = state.entities[channelName];
+    return adapter.updateOne({id: channelName, changes: {unreadCount: channel.unreadCount + 1}}, state);
+  }),
+  on(markMessagesAsRead, (state, {channelName}) =>
+    adapter.updateOne({id: channelName, changes: {unreadCount: 0}}, state))
 )
 
 export function channelsReducer(state: ChannelsState | undefined, action: Action) {

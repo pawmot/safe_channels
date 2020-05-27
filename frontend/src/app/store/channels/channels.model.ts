@@ -3,10 +3,10 @@ export interface Channel {
   name: string;
   state: ChannelState,
   error: "nameAlreadyTaken" | "wrongChannel" | "somethingWentWrong",
-  sharedKey: number[],
   fingerprint: string,
   localPubKey: string,
-  remotePubKey: string
+  remotePubKey: string,
+  unreadCount: number
 }
 
 export enum ChannelState {

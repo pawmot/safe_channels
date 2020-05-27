@@ -24,7 +24,7 @@ import {
   channelCreationFailed,
   connected,
   connectionFailed,
-  cryptoData
+  cryptoData, newUnreadMessage
 } from "./store/channels/channels.actions";
 import {addIncomingMessage, addSystemMessage} from "./store/messages/messages.actions";
 import {selectChannelByName} from "./store/channels/channels.selectors";
@@ -157,7 +157,6 @@ export class ChannelsService {
             .digest("hex").substr(0, 5);
           this.store.dispatch(cryptoData({
             channelName: result.channelName,
-            sharedKey: sharedKey,
             fingerprint: fingerprint,
             localPubKey: localPubKey,
             remotePubKey: result.binaryContent
@@ -174,6 +173,7 @@ export class ChannelsService {
           const decryptedBytes = this.cipherPairs.get(chan.name).input.encrypt(cipherText);
           let msg = utf8.fromBytes(decryptedBytes);
           this.store.dispatch(addIncomingMessage({channelName: result.channelName, content: msg}));
+          this.store.dispatch(newUnreadMessage({channelName: result.channelName}));
         }
         break;
       }

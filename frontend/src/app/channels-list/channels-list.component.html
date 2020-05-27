@@ -6,7 +6,7 @@
   <hr>
   <mat-action-list>
     <button *ngFor="let c of channels" mat-list-item (click)="selectChannel(c.name)">
-      <span [class.selected]="c.name === this.selectedChannel">{{ c.name }}</span>
+      <span [class.selected]="c.name === this.selectedChannel">{{ c.name }} {{ c.unreadCount ? "*" : ""}}</span>
     </button>
   </mat-action-list>
 </div>
