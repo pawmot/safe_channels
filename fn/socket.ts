@@ -69,7 +69,16 @@ export const handleDisconnection: Handler<APIGatewayProxyEvent> = async (ev): Pr
             }
             if (!channel.isOpen) {
                 const msg = channelClosedMessage(channel.channelName);
-                await sendMessageToClient(getCallbackUrl(ev), channel.connectionIds.filter(cid => cid !== ev.requestContext.connectionId)[0], msg)
+                const otherClient = channel.connectionIds.filter(cid => cid !== ev.requestContext.connectionId)[0];
+                try {
+                    await sendMessageToClient(getCallbackUrl(ev), otherClient, msg)
+                } catch (e) {
+                    if (e.statusCode === 410) {
+                        console.log(`Client ${otherClient} apparently is disconnected, too.`);
+                    } else {
+                        throw e;
+                    }
+                }
             }
             await ddb.delete({
                 TableName: tableName,

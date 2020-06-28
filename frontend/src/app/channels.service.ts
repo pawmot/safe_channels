@@ -32,10 +32,10 @@ import {take} from "rxjs/operators";
 import {ec as EC} from "elliptic";
 import * as hash from "hash.js";
 import {ChannelState} from "./store/channels/channels.model";
-import {Counter, ModeOfOperation, utils} from "aes-js";
-import hex = utils.hex;
+import {ModeOfOperation, utils, padding} from "aes-js";
+import * as b64 from "byte-base64";
 import utf8 = utils.utf8;
-import ModeOfOperationCTR = ModeOfOperation.ModeOfOperationCTR;
+import pkcs7 = padding.pkcs7;
 
 @Injectable({
   providedIn: 'root'
@@ -47,7 +47,7 @@ export class ChannelsService {
   private connected = false;
   private ec = new EC("curve25519");
   private keypairs = new Map<string, EC.KeyPair>();
-  private cipherPairs = new Map<string, CipherPair>();
+  private sharedKeys = new Map<string, number[]>();
 
   constructor(private store: Store<State>) {
   }
@@ -164,13 +164,13 @@ export class ChannelsService {
           this.store.dispatch(addSystemMessage({channelName: chan.name, content: "ECDH complete, channel is now secure!" }));
           this.store.dispatch(addSystemMessage({channelName: chan.name, content: `Channel fingerprint: ${fingerprint}`}));
           this.keypairs.delete(result.channelName);
-          this.cipherPairs.set(chan.name, new CipherPair(
-            new ModeOfOperation.ctr(sharedKey, new Counter(localPubKey <= result.binaryContent ? sharedKey[0] : sharedKey[1])),
-            new ModeOfOperation.ctr(sharedKey, new Counter(localPubKey <= result.binaryContent ? sharedKey[1] : sharedKey[0]))
-          ))
+          this.sharedKeys.set(chan.name, sharedKey);
         } else {
-          const cipherText = hex.toBytes(result.binaryContent);
-          const decryptedBytes = this.cipherPairs.get(chan.name).input.encrypt(cipherText);
+          const [ivB, cipherTextB] = result.binaryContent.split('|', 2);
+          const iv = b64.base64ToBytes(ivB)
+          const cipherText = b64.base64ToBytes(cipherTextB);
+          let aesCbc = new ModeOfOperation.cbc(this.sharedKeys.get(chan.name), iv);
+          const decryptedBytes = pkcs7.strip(aesCbc.decrypt(cipherText));
           let msg = utf8.fromBytes(decryptedBytes);
           this.store.dispatch(addIncomingMessage({channelName: result.channelName, content: msg}));
           this.store.dispatch(newUnreadMessage({channelName: result.channelName}));
@@ -197,12 +197,11 @@ export class ChannelsService {
   public async sendMessage(channelName: string, message: string) {
     const chan = await this.store.select(selectChannelByName(channelName)).pipe(take(1)).toPromise();
     let textBytes = utf8.toBytes(message);
-    let cipherText = this.cipherPairs.get(chan.name).output.encrypt(textBytes);
-    let encryptedMsg = hex.fromBytes(cipherText);
-    this.sendToServer(clientBinaryExchangeMessage(channelName, encryptedMsg));
+    let iv = new Uint8Array(16);
+    crypto.getRandomValues(iv);
+    let aesCbc = new ModeOfOperation.cbc(this.sharedKeys.get(chan.name), iv);
+    let cipherText = aesCbc.encrypt(pkcs7.pad(textBytes));
+    let msg = `${b64.bytesToBase64(iv)}|${b64.bytesToBase64(cipherText)}`
+    this.sendToServer(clientBinaryExchangeMessage(channelName, msg));
   }
-}
-
-class CipherPair {
-  constructor(public input: ModeOfOperationCTR, public output: ModeOfOperationCTR) {}
 }

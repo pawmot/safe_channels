@@ -1,3 +1,6 @@
+org: pawmot
+app: safe-channels
+
 service:
   name: safe-channels
 
@@ -15,6 +18,7 @@ provider:
   runtime: nodejs12.x
   region: eu-west-1
   stage: ${opt:stage, 'dev'}
+  endpointType: REGIONAL
   websocketsApiName: ${self:provider.stage}-safe-channels-ws-api
   websocketsApiRouteSelectionExpression: $request.body.type
   apiGateway:
