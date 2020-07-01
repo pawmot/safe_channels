@@ -11,6 +11,7 @@ Serverless (AWS Lambda) app for exchanging pieces of data safely between two par
 
 ### Todo
 
-* Fix binary files serving (e.g. favicon)
-* Set up HTTP caching (AWS API GW? Or possibly move the static files out of Lambda)
-* Fix TSLint in Idea (different tslint.json in frontend than in lambda)
+- [ ] Fix binary files serving (e.g. favicon)
+- [ ] Set up HTTP caching (AWS API GW? Or possibly move the static files out of Lambda)
+- [ ] Fix TSLint in Idea (different tslint.json in frontend than in lambda)
+- [ ] Switch from stream AES into regular block AES
