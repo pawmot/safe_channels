@@ -57,7 +57,7 @@ export class ChannelsService {
   }
 
   private createSocket() {
-    this.socket = new WebSocket(environment.wssAddress);
+    this.socket = new WebSocket(environment.config.wssAddress);
     this.connected = true;
     this.socket.onmessage = this.handleMessage.bind(this);
     this.socket.onclose = (ev) => {

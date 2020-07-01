@@ -2,9 +2,12 @@
 // `ng build --prod` replaces `environment.ts` with `environment.prod.ts`.
 // The list of file replacements can be found in `angular.json`.
 
-export const environment = {
-  production: false,
-  wssAddress: "wss://slb7hbir4b.execute-api.eu-west-1.amazonaws.com/dev"
+export var environment = {
+  remoteConfig: false,
+  config: {
+    production: false,
+    wssAddress: "wss://slb7hbir4b.execute-api.eu-west-1.amazonaws.com/dev"
+  }
 };
 
 /*

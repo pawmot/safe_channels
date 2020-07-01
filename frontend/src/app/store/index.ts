@@ -16,7 +16,7 @@ export const reducers: ActionReducerMap<State> = {
 export const selectChannelsState = (state: State) => state.channels;
 export const selectMessagesState = (state: State) => state.messages;
 
-export const metaReducers: MetaReducer<State>[] = !environment.production ? [logger] : [];
+export const metaReducers: MetaReducer<State>[] = !environment.config.production ? [logger] : [];
 
 function logger(reducer: ActionReducer<State>): ActionReducer<State> {
   return (state, action) => {

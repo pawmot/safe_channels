@@ -15,7 +15,7 @@ export const handler: APIGatewayProxyHandler = async (event, _): Promise<APIGate
     }
 
     try {
-        const content = await getFileContent(filename, getBaseHref(event));
+        const content = await getFileContent(filename);
 
         console.log(content)
 
@@ -43,7 +43,7 @@ export const handler: APIGatewayProxyHandler = async (event, _): Promise<APIGate
     }
 };
 
-async function getFileContent(filename: string, baseHref: string) : Promise<string> {
+async function getFileContent(filename: string) : Promise<string> {
     const fileLocation = `static${filename}`;
 
     if (contentsByFileName.has(fileLocation)) {
@@ -58,9 +58,6 @@ async function getFileContent(filename: string, baseHref: string) : Promise<stri
 
     if (isText(fileLocation)) {
         filePromise = fs.promises.readFile(fileLocation, {encoding: "utf-8"});
-        if (filename === '/index.html') {
-            filePromise = filePromise.then(str => str.replace(/\$BASE_HREF/, baseHref))
-        }
     } else {
         filePromise = fs.promises.readFile(fileLocation).then(buf => buf.toString('base64'));
     }
@@ -80,10 +77,6 @@ async function fileExists(filename: string) : Promise<boolean> {
         else
             throw e;
     }
-}
-
-function getBaseHref(event: APIGatewayProxyEvent): string {
-    return `/${event.requestContext.stage}/`;
 }
 
 class FileNotFoundError {

@@ -4,14 +4,10 @@ app: safe-channels
 service:
   name: safe-channels
 
-custom:
-  webpack:
-    webpackConfig: ./webpack.config.js
-    includeModules: true
-
 plugins:
   - serverless-webpack
   - serverless-pseudo-parameters
+  - serverless-domain-manager
 
 provider:
   name: aws
@@ -42,6 +38,18 @@ provider:
       Action: dynamodb:DeleteItem
       Resource: arn:aws:dynamodb:#{AWS::Region}:#{AWS::AccountId}:table/${self:provider.stage}-channels
 
+custom:
+  stage: ${opt:stage, self:provider.stage}
+  webpack:
+    webpackConfig: ./webpack.config.js
+    includeModules: true
+  customDomain:
+    domainName: ${file(stages.yaml):${self:custom.stage}.domain}
+    basePath: ''
+    stage: ${self:custom.stage}
+    createRoute53Record: true
+    endpointType: 'regional'
+
 functions:
   static:
     handler: fn/static.handler
@@ -53,6 +61,18 @@ functions:
       - http:
           method: get
           path: /
+    environment:
+      PRODUCTION: ${file(env/${self:provider.stage}.yaml):production}
+
+  appConfig:
+    handler: fn/appConfig.handler
+    events:
+      - http:
+          method: get
+          path: /appConfig
+    environment:
+      PRODUCTION: ${file(env/${self:provider.stage}.yaml):production}
+      WSS_ADDRESS: ${file(env/${self:provider.stage}.yaml):wssAddress}
 
   handleConnection:
     handler: fn/socket.handleConnection
