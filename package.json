@@ -9,7 +9,7 @@
     "deploy-all": "cd frontend && ng build --prod && cd .. && sls deploy"
   },
   "dependencies": {
-    "aws-sdk": "^2.657.0",
+    "aws-sdk": "^2.814.0",
     "istextorbinary": "^3.3.0",
     "mime-types": "^2.1.26",
     "source-map-support": "^0.5.16"
